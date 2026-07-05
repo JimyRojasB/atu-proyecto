@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATU — Panel de Control Distribuido</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0d0d1a; color: #e0e0e0; min-height: 100vh; }
+
+        header {
+            background: linear-gradient(135deg, #1a1a3e, #2d2d6e);
+            padding: 14px 24px;
+            display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 2px solid #e63946;
+        }
+        header h1 { font-size: 1.2rem; color: #fff; letter-spacing: 1px; }
+        header .links a {
+            color: #aaa; text-decoration: none; margin-left: 16px;
+            font-size: 0.85rem; padding: 5px 12px; border-radius: 4px;
+            border: 1px solid #333; transition: all 0.2s;
+        }
+        header .links a:hover, header .links a.active { color: #fff; background: #e63946; border-color: #e63946; }
+
+        .grid-main { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; padding: 16px; }
+        .grid-bottom { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; padding: 0 16px 16px; }
+
+        .card {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 10px; padding: 16px;
+        }
+        .card h3 {
+            font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1.5px;
+            color: #888; margin-bottom: 12px; padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+
+        /* KPI cards */
+        .kpi { text-align: center; padding: 20px 16px; }
+        .kpi .valor { font-size: 2.4rem; font-weight: 700; color: #fff; line-height: 1; }
+        .kpi .label { font-size: 0.78rem; color: #888; margin-top: 6px; }
+        .kpi .delta { font-size: 0.72rem; color: #2ecc71; margin-top: 4px; }
+
+        /* Arquitectura distribuida */
+        .arch { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; padding: 10px 0; }
+        .nodo {
+            background: rgba(255,255,255,0.06); border-radius: 8px;
+            padding: 10px 14px; text-align: center; min-width: 90px;
+            border: 1px solid rgba(255,255,255,0.1); position: relative;
+        }
+        .nodo .nodo-icon { font-size: 1.5rem; }
+        .nodo .nodo-label { font-size: 0.7rem; color: #aaa; margin-top: 4px; }
+        .nodo .nodo-status {
+            font-size: 0.65rem; margin-top: 3px; padding: 2px 6px;
+            border-radius: 10px; font-weight: bold;
+        }
+        .status-ok { background: rgba(46,204,113,0.2); color: #2ecc71; }
+        .status-err { background: rgba(230,57,70,0.2); color: #e63946; }
+        .status-warn { background: rgba(255,193,7,0.2); color: #ffc107; }
+        .flecha { color: #555; font-size: 1.2rem; }
+
+        /* Tabla buses */
+        table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+        thead th {
+            text-align: left; padding: 8px 10px; color: #888;
+            font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        tbody tr { border-bottom: 1px solid rgba(255,255,255,0.04); cursor: pointer; transition: background 0.15s; }
+        tbody tr:hover { background: rgba(255,255,255,0.05); }
+        tbody tr.seleccionado { background: rgba(230,57,70,0.1); border-left: 3px solid #e63946; }
+        tbody td { padding: 9px 10px; }
+        .bus-badge {
+            background: #e63946; color: #fff; padding: 2px 8px;
+            border-radius: 4px; font-size: 0.72rem; font-weight: bold;
+        }
+        .pill {
+            padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: bold;
+        }
+        .pill-ok { background: rgba(46,204,113,0.15); color: #2ecc71; }
+        .pill-warn { background: rgba(255,193,7,0.15); color: #ffc107; }
+
+        /* Log eventos */
+        #log-eventos {
+            height: 260px; overflow-y: auto; font-size: 0.75rem;
+            font-family: 'Courier New', monospace; color: #aaa;
+        }
+        .log-line { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
+        .log-line .ts { color: #555; margin-right: 8px; }
+        .log-line .tipo-tcp { color: #3498db; }
+        .log-line .tipo-http { color: #9b59b6; }
+        .log-line .tipo-db { color: #f39c12; }
+        .log-line .tipo-sys { color: #2ecc71; }
+
+        /* Panel detalle bus */
+        #detalle-bus { min-height: 120px; }
+        .detalle-vacio { color: #555; font-size: 0.8rem; text-align: center; padding: 30px 0; }
+        .detalle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .detalle-item .di-label { font-size: 0.68rem; color: #666; text-transform: uppercase; letter-spacing: 1px; }
+        .detalle-item .di-valor { font-size: 0.9rem; color: #fff; margin-top: 2px; }
+
+        /* Barra inferior */
+        #status-bar {
+            position: fixed; bottom: 0; width: 100%;
+            background: rgba(10,10,20,0.95); padding: 5px 16px;
+            display: flex; gap: 24px; font-size: 0.75rem; color: #666;
+            border-top: 1px solid rgba(255,255,255,0.06); z-index: 100;
+        }
+        .dot { width: 7px; height: 7px; border-radius: 50%; background: #2ecc71; display: inline-block; animation: pulse 1.5s infinite; margin-right: 5px; }
+        .dot.err { background: #e63946; animation: none; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>🚌 ATU — Panel de Control Distribuido</h1>
+    <div class="links">
+        <a href="dashboard.html">Mapa en vivo</a>
+        <a href="dashboard2.html" class="active">Panel de control</a>
+    </div>
+</header>
+
+<!-- KPIs -->
+<div class="grid-main">
+    <div class="card kpi">
+        <div class="valor" id="kpi-buses">—</div>
+        <div class="label">Buses activos</div>
+        <div class="delta" id="kpi-buses-delta">actualizando...</div>
+    </div>
+    <div class="card kpi">
+        <div class="valor" id="kpi-mensajes">—</div>
+        <div class="label">Mensajes TCP recibidos</div>
+        <div class="delta" id="kpi-msg-delta">actualizando...</div>
+    </div>
+    <div class="card kpi">
+        <div class="valor" id="kpi-uptime">—</div>
+        <div class="label">Uptime del servidor</div>
+        <div class="delta">servidor principal :8080</div>
+    </div>
+</div>
+
+<!-- Arquitectura + tabla -->
+<div class="grid-bottom">
+    <div style="display:flex; flex-direction:column; gap:14px;">
+
+        <!-- Arquitectura distribuida -->
+        <div class="card">
+            <h3>Arquitectura del sistema distribuido</h3>
+            <div class="arch">
+                <div class="nodo">
+                    <div class="nodo-icon">🚌</div>
+                    <div class="nodo-label">6 Buses<br>BusCliente</div>
+                    <div class="nodo-status status-ok" id="arch-buses">ACTIVOS</div>
+                </div>
+                <div class="flecha">→</div>
+                <div class="nodo">
+                    <div class="nodo-icon">⚖️</div>
+                    <div class="nodo-label">HAProxy<br>:9000/:9001</div>
+                    <div class="nodo-status" id="arch-haproxy">verificando</div>
+                </div>
+                <div class="flecha">→</div>
+                <div style="display:flex;flex-direction:column;gap:6px;">
+                    <div class="nodo">
+                        <div class="nodo-icon">🖥️</div>
+                        <div class="nodo-label">Servidor<br>Principal :8080</div>
+                        <div class="nodo-status" id="arch-srv1">verificando</div>
+                    </div>
+                    <div class="nodo">
+                        <div class="nodo-icon">🖥️</div>
+                        <div class="nodo-label">Servidor<br>Respaldo :8081</div>
+                        <div class="nodo-status" id="arch-srv2">verificando</div>
+                    </div>
+                </div>
+                <div class="flecha">→</div>
+                <div class="nodo">
+                    <div class="nodo-icon">🗄️</div>
+                    <div class="nodo-label">MariaDB<br>atu_monitoreo</div>
+                    <div class="nodo-status" id="arch-db">verificando</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabla de buses -->
+        <div class="card">
+            <h3>Estado de buses — clic para ver detalle</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Bus ID</th>
+                        <th>Ruta</th>
+                        <th>Latitud</th>
+                        <th>Longitud</th>
+                        <th>Última señal</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody id="tabla-buses">
+                    <tr><td colspan="6" style="color:#555;text-align:center;padding:20px">Cargando buses...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Columna derecha -->
+    <div style="display:flex; flex-direction:column; gap:14px;">
+
+        <!-- Detalle bus seleccionado -->
+        <div class="card">
+            <h3>Detalle del bus seleccionado</h3>
+            <div id="detalle-bus">
+                <div class="detalle-vacio">Selecciona un bus de la tabla</div>
+            </div>
+        </div>
+
+        <!-- Log de eventos -->
+        <div class="card">
+            <h3>Log de eventos en tiempo real</h3>
+            <div id="log-eventos"></div>
+        </div>
+    </div>
+</div>
+
+<div id="status-bar">
+    <span><span class="dot" id="dot-general"></span><span id="estado-general">Conectando...</span></span>
+    <span>Actualización: cada 3s</span>
+    <span id="sb-mensajes"></span>
+    <span id="sb-hora"></span>
+</div>
+
+<script>
+const IP = window.location.hostname;
+const API_BUSES  = `http://${IP}:8080/buses`;
+const API_STATS  = `http://${IP}:8080/stats`;
+const API_HEALTH1 = `http://${IP}:8080/health`;
+const API_HEALTH2 = `http://${IP}:8081/health`;
+
+const RUTAS = {
+    'BUS-101': 'Av. Javier Prado (San Isidro → La Molina)',
+    'BUS-202': 'Av. Arequipa (Lima Centro → Miraflores)',
+    'BUS-303': 'Av. La Marina (San Miguel → Callao)',
+    'BUS-404': 'Av. Universitaria (Los Olivos → San Miguel)',
+    'BUS-505': 'Av. Brasil (Breña → Magdalena)',
+    'BUS-606': 'Av. Benavides (Miraflores → Surco)',
+};
+
+let busSeleccionado = null;
+let ultimosDatos = {};
+let contadorLog = 0;
+
+function agregarLog(tipo, mensaje) {
+    const log = document.getElementById('log-eventos');
+    const ts = new Date().toLocaleTimeString();
+    const div = document.createElement('div');
+    div.className = 'log-line';
+    div.innerHTML = `<span class="ts">${ts}</span><span class="tipo-${tipo}">[${tipo.toUpperCase()}]</span> ${mensaje}`;
+    log.insertBefore(div, log.firstChild);
+    if (log.children.length > 60) log.removeChild(log.lastChild);
+}
+
+function formatUptime(segundos) {
+    const h = Math.floor(segundos / 3600);
+    const m = Math.floor((segundos % 3600) / 60);
+    const s = segundos % 60;
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+}
+
+function segundosDesde(timestamp) {
+    const diff = Math.floor((Date.now() - new Date(timestamp).getTime()) / 1000);
+    if (diff < 5) return 'Ahora';
+    if (diff < 60) return `hace ${diff}s`;
+    return `hace ${Math.floor(diff/60)}m`;
+}
+
+async function verificarHealth(url, elementId) {
+    try {
+        const r = await fetch(url, { signal: AbortSignal.timeout(2000) });
+        const el = document.getElementById(elementId);
+        if (r.ok) {
+            el.textContent = 'ACTIVO';
+            el.className = 'nodo-status status-ok';
+        } else {
+            el.textContent = 'ERROR';
+            el.className = 'nodo-status status-err';
+        }
+        return r.ok;
+    } catch {
+        const el = document.getElementById(elementId);
+        el.textContent = 'CAÍDO';
+        el.className = 'nodo-status status-err';
+        return false;
+    }
+}
+
+async function actualizarStats() {
+    try {
+        const r = await fetch(API_STATS);
+        const s = await r.json();
+        const prevMsg = parseInt(document.getElementById('kpi-mensajes').textContent) || 0;
+        const nuevoMsg = s.mensajes_recibidos;
+        const diff = nuevoMsg - prevMsg;
+
+        document.getElementById('kpi-buses').textContent = s.buses_activos;
+        document.getElementById('kpi-mensajes').textContent = nuevoMsg;
+        document.getElementById('kpi-uptime').textContent = formatUptime(s.uptime_segundos);
+        document.getElementById('kpi-buses-delta').textContent = `TCP :${s.puerto_tcp} | HTTP :${s.puerto_http}`;
+        document.getElementById('kpi-msg-delta').textContent = diff > 0 ? `+${diff} nuevos` : 'sin cambios';
+        document.getElementById('sb-mensajes').textContent = `Mensajes totales: ${nuevoMsg}`;
+
+        if (diff > 0) agregarLog('tcp', `${diff} mensajes GPS recibidos del servidor :${s.puerto_tcp}`);
+    } catch (e) {
+        agregarLog('sys', `Error al obtener stats: ${e.message}`);
+    }
+}
+
+async function actualizarBuses() {
+    try {
+        const r = await fetch(API_BUSES);
+        const buses = await r.json();
+
+        agregarLog('http', `GET /buses → ${buses.length} buses recibidos`);
+        document.getElementById('dot-general').classList.remove('err');
+        document.getElementById('estado-general').textContent = `Conectado — ${buses.length} buses activos`;
+        document.getElementById('arch-db').textContent = 'ACTIVA';
+        document.getElementById('arch-db').className = 'nodo-status status-ok';
+
+        const tbody = document.getElementById('tabla-buses');
+        tbody.innerHTML = '';
+
+        buses.forEach(bus => {
+            const ruta = RUTAS[bus.id_bus] || 'Ruta desconocida';
+            const rutaCorta = ruta.split('(')[0].trim();
+            const segs = Math.floor((Date.now() - new Date(bus.timestamp).getTime()) / 1000);
+            const estado = segs < 10 ? 'pill-ok' : 'pill-warn';
+            const estadoTxt = segs < 10 ? 'EN LÍNEA' : 'TARDÍO';
+
+            const tr = document.createElement('tr');
+            if (busSeleccionado === bus.id_bus) tr.classList.add('seleccionado');
+            tr.innerHTML = `
+                <td><span class="bus-badge">${bus.id_bus}</span></td>
+                <td style="color:#ccc;font-size:0.78rem">${rutaCorta}</td>
+                <td>${parseFloat(bus.latitud).toFixed(5)}</td>
+                <td>${parseFloat(bus.longitud).toFixed(5)}</td>
+                <td style="color:#888">${segundosDesde(bus.timestamp)}</td>
+                <td><span class="pill ${estado}">${estadoTxt}</span></td>
+            `;
+            tr.onclick = () => seleccionarBus(bus, ruta);
+            tbody.appendChild(tr);
+            ultimosDatos[bus.id_bus] = { ...bus, ruta };
+        });
+
+        if (busSeleccionado && ultimosDatos[busSeleccionado]) {
+            mostrarDetalle(ultimosDatos[busSeleccionado]);
+        }
+
+        document.getElementById('sb-hora').textContent = `Última actualización: ${new Date().toLocaleTimeString()}`;
+
+    } catch (e) {
+        document.getElementById('dot-general').classList.add('err');
+        document.getElementById('estado-general').textContent = 'Error de conexión';
+        agregarLog('sys', `Error: ${e.message}`);
+    }
+}
+
+function seleccionarBus(bus, ruta) {
+    busSeleccionado = bus.id_bus;
+    mostrarDetalle({ ...bus, ruta });
+    document.querySelectorAll('tbody tr').forEach(tr => tr.classList.remove('seleccionado'));
+    event.currentTarget.classList.add('seleccionado');
+    agregarLog('http', `Bus seleccionado: ${bus.id_bus} — ${ruta}`);
+}
+
+function mostrarDetalle(bus) {
+    const segs = Math.floor((Date.now() - new Date(bus.timestamp).getTime()) / 1000);
+    document.getElementById('detalle-bus').innerHTML = `
+        <div class="detalle-grid">
+            <div class="detalle-item">
+                <div class="di-label">Bus ID</div>
+                <div class="di-valor"><span class="bus-badge">${bus.id_bus}</span></div>
+            </div>
+            <div class="detalle-item">
+                <div class="di-label">Estado</div>
+                <div class="di-valor"><span class="pill ${segs < 10 ? 'pill-ok':'pill-warn'}">${segs < 10 ? 'EN LÍNEA':'TARDÍO'}</span></div>
+            </div>
+            <div class="detalle-item">
+                <div class="di-label">Latitud</div>
+                <div class="di-valor">${parseFloat(bus.latitud).toFixed(6)}</div>
+            </div>
+            <div class="detalle-item">
+                <div class="di-label">Longitud</div>
+                <div class="di-valor">${parseFloat(bus.longitud).toFixed(6)}</div>
+            </div>
+            <div class="detalle-item" style="grid-column:1/-1">
+                <div class="di-label">Ruta asignada</div>
+                <div class="di-valor" style="font-size:0.8rem;color:#ccc">${bus.ruta}</div>
+            </div>
+            <div class="detalle-item" style="grid-column:1/-1">
+                <div class="di-label">Última señal GPS</div>
+                <div class="di-valor" style="font-size:0.8rem">${bus.timestamp} (hace ${segs}s)</div>
+            </div>
+        </div>
+    `;
+}
+
+async function ciclo() {
+    await Promise.all([
+        actualizarBuses(),
+        actualizarStats(),
+        verificarHealth(API_HEALTH1, 'arch-srv1'),
+        verificarHealth(API_HEALTH2, 'arch-srv2'),
+    ]);
+
+    // HAProxy: si ambos servidores están OK se asume OK
+    const srv1 = document.getElementById('arch-srv1').textContent === 'ACTIVO';
+    const srv2 = document.getElementById('arch-srv2').textContent === 'ACTIVO';
+    const hp = document.getElementById('arch-haproxy');
+    if (srv1 || srv2) { hp.textContent = 'ACTIVO'; hp.className = 'nodo-status status-ok'; }
+    else { hp.textContent = 'CAÍDO'; hp.className = 'nodo-status status-err'; }
+}
+
+agregarLog('sys', 'Dashboard de control distribuido iniciado');
+ciclo();
+setInterval(ciclo, 3000);
+</script>
+
+<div style="height:32px"></div>
+</body>
+</html>
