@@ -1,5 +1,21 @@
-10.134.113.102 - - [05/Jul/2026 15:55:58] "GET /dashboard.html HTTP/1.1" 200 -
-10.134.113.102 - - [05/Jul/2026 15:55:58] "GET /leaflet/leaflet.css HTTP/1.1" 200 -
-10.134.113.102 - - [05/Jul/2026 15:55:58] "GET /leaflet/leaflet.js HTTP/1.1" 200 -
-10.134.113.102 - - [05/Jul/2026 15:56:00] code 404, message File not found
-10.134.113.102 - - [05/Jul/2026 15:56:00] "GET /favicon.ico HTTP/1.1" 404 -
+172.31.88.32 - - [05/Jul/2026 16:38:03] code 404, message File not found
+172.31.88.32 - - [05/Jul/2026 16:38:03] "GET /leaflet/leaflet.js.map HTTP/1.1" 404 -
+172.31.88.32 - - [05/Jul/2026 16:38:29] code 404, message File not found
+172.31.88.32 - - [05/Jul/2026 16:38:29] "GET /leaflet/leaflet.js.map HTTP/1.1" 404 -
+172.31.88.32 - - [05/Jul/2026 16:40:07] "GET /dashboard.html HTTP/1.1" 200 -
+172.31.88.32 - - [05/Jul/2026 16:40:07] "GET /leaflet/leaflet.css HTTP/1.1" 200 -
+172.31.88.32 - - [05/Jul/2026 16:40:07] "GET /leaflet/leaflet.js HTTP/1.1" 200 -
+172.31.88.32 - - [05/Jul/2026 16:40:07] code 404, message File not found
+172.31.88.32 - - [05/Jul/2026 16:40:07] "GET /leaflet/leaflet.js.map HTTP/1.1" 404 -
+172.31.88.32 - - [05/Jul/2026 16:40:08] code 404, message File not found
+172.31.88.32 - - [05/Jul/2026 16:40:08] "GET /favicon.ico HTTP/1.1" 404 -
+172.31.88.32 - - [05/Jul/2026 16:49:03] "GET /dashboard2.html HTTP/1.1" 200 -
+172.31.88.32 - - [05/Jul/2026 16:49:03] code 404, message File not found
+172.31.88.32 - - [05/Jul/2026 16:49:03] "GET /favicon.ico HTTP/1.1" 404 -
+172.31.88.32 - - [05/Jul/2026 16:49:06] "GET /dashboard.html HTTP/1.1" 304 -
+172.31.88.32 - - [05/Jul/2026 16:51:00] "GET /dashboard.html HTTP/1.1" 200 -
+172.31.88.32 - - [05/Jul/2026 16:51:00] "GET /leaflet/leaflet.css HTTP/1.1" 200 -
+172.31.88.32 - - [05/Jul/2026 16:51:00] "GET /leaflet/leaflet.js HTTP/1.1" 200 -
+172.31.88.32 - - [05/Jul/2026 16:51:01] code 404, message File not found
+172.31.88.32 - - [05/Jul/2026 16:51:01] "GET /favicon.ico HTTP/1.1" 404 -
+172.31.88.32 - - [05/Jul/2026 16:51:16] "GET /dashboard.html HTTP/1.1" 304 -

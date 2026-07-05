@@ -87,6 +87,7 @@
 <header>
     <h1>🚌 ATU — Monitor de Buses Lima/Callao</h1>
     <span class="badge" id="contador">0 buses activos</span>
+    <a href="dashboard2.html" style="color:#fff;text-decoration:none;background:rgba(255,255,255,0.2);padding:6px 14px;border-radius:6px;font-size:0.85rem;border:1px solid rgba(255,255,255,0.4);">Panel de control</a>
 </header>
 
 <div id="mapa"></div>
@@ -99,7 +100,7 @@
 <div id="status-bar">
     <span><span class="dot" id="dot"></span> <span id="estado">Conectando...</span></span>
     <span>Actualización: cada 3s</span>
-    <span>Endpoint: <code>http://10.134.113.102:8080/buses</code></span>
+    <span>Endpoint: <code>http://172.31.88.102:8080/buses</code></span>
     <span id="ultima-act"></span>
 </div>
 
@@ -140,7 +141,7 @@
     }
 
     function actualizarMapa() {
-        fetch('http://10.134.113.102:8080/buses')
+        fetch('http://172.31.88.102:8080/buses')
             .then(r => {
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 return r.json();
