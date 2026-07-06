@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATU · Sistema de Monitoreo de Buses en Tiempo Real</title>
+<style>
+:root{
+  --bg:#F3F7FC; --surface:#FFFFFF; --surface-2:#EAF2FA;
+  --ink:#0B2A4A; --ink-soft:#4C6A88; --ink-faint:#7C93AC;
+  --navy:#004C97; --navy-deep:#00305F; --navy-ink:#062B4D;
+  --cyan:#00A3E0; --cyan-deep:#0084B8; --cyan-tint:#E4F6FC;
+  --amber:#C97D0F; --green:#1E8A5B; --red:#C43D3D;
+  --border:#D8E4F0; --border-soft:#E7EFF7;
+  --code-bg:#062B4A; --code-ink:#DCEFFB;
+  --shadow:0 16px 40px rgba(4,32,64,.14);
+  --radius:20px;
+  --display:"Bahnschrift SemiBold","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --body:"Segoe UI",system-ui,Roboto,Arial,sans-serif;
+  --mono:"Consolas","Monaco","Liberation Mono",monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#071522; --surface:#0D2233; --surface-2:#122B40;
+    --ink:#EAF3FB; --ink-soft:#A9C4DC; --ink-faint:#7592AC;
+    --navy:#6FB1E8; --navy-deep:#0A2E4C; --navy-ink:#DCEEFB;
+    --cyan:#36CBFA; --cyan-deep:#22A9D9; --cyan-tint:rgba(54,203,250,.12);
+    --amber:#F0B25C; --green:#3FCB8D; --red:#EC6F68;
+    --border:#1C3A52; --border-soft:#16293A;
+    --code-bg:#04141F; --code-ink:#CFEBFB;
+    --shadow:0 16px 40px rgba(0,0,0,.45);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#071522; --surface:#0D2233; --surface-2:#122B40;
+  --ink:#EAF3FB; --ink-soft:#A9C4DC; --ink-faint:#7592AC;
+  --navy:#6FB1E8; --navy-deep:#0A2E4C; --navy-ink:#DCEEFB;
+  --cyan:#36CBFA; --cyan-deep:#22A9D9; --cyan-tint:rgba(54,203,250,.12);
+  --amber:#F0B25C; --green:#3FCB8D; --red:#EC6F68;
+  --border:#1C3A52; --border-soft:#16293A;
+  --code-bg:#04141F; --code-ink:#CFEBFB;
+  --shadow:0 16px 40px rgba(0,0,0,.45);
+}
+:root[data-theme="light"]{
+  --bg:#F3F7FC; --surface:#FFFFFF; --surface-2:#EAF2FA;
+  --ink:#0B2A4A; --ink-soft:#4C6A88; --ink-faint:#7C93AC;
+  --navy:#004C97; --navy-deep:#00305F; --navy-ink:#062B4D;
+  --cyan:#00A3E0; --cyan-deep:#0084B8; --cyan-tint:#E4F6FC;
+  --amber:#C97D0F; --green:#1E8A5B; --red:#C43D3D;
+  --border:#D8E4F0; --border-soft:#E7EFF7;
+  --code-bg:#062B4A; --code-ink:#DCEFFB;
+  --shadow:0 16px 40px rgba(4,32,64,.14);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;font-family:var(--body);color:var(--ink);line-height:1.65;background:var(--bg)}
+h1,h2,h3,h4{font-family:var(--display);text-wrap:balance;margin:0}
+::selection{background:var(--cyan);color:#00121F}
+a{color:var(--cyan-deep)}
+.container{width:min(1180px,92vw);margin:0 auto}
+
+/* ---------- HERO ---------- */
+.hero{position:relative;overflow:hidden;background:linear-gradient(160deg,var(--navy-deep) 0%,var(--navy) 62%,#0C6AA8 100%);padding:56px 6vw 44px;color:#fff}
+.hero .stripe{position:absolute;inset:0;background:linear-gradient(105deg,transparent 42%,rgba(0,163,224,.9) 47%,rgba(0,163,224,.9) 56%,transparent 61%);mix-blend-mode:screen;opacity:.85;pointer-events:none}
+.hero-top{display:flex;align-items:center;gap:16px;position:relative;z-index:2;margin-bottom:26px}
+.bus-badge{width:56px;height:56px;border-radius:14px;background:var(--cyan);display:flex;align-items:center;justify-content:center;flex:none;box-shadow:0 8px 22px rgba(0,0,0,.25)}
+.bus-badge svg{width:34px;height:34px}
+.hero-kicker{font-family:var(--display);font-weight:800;letter-spacing:.14em;text-transform:uppercase;font-size:.82rem;color:#CDEBFA;border-left:3px solid var(--cyan);padding-left:10px}
+.hero h1{position:relative;z-index:2;font-size:clamp(2.1rem,4.4vw,3.85rem);line-height:1.05;letter-spacing:-.01em;max-width:980px;margin-bottom:16px;font-weight:800}
+.hero p.lead{position:relative;z-index:2;font-size:1.12rem;max-width:820px;color:#DCEEFA;margin:0 0 26px}
+.hero-meta{position:relative;z-index:2;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;max-width:1080px}
+.hero-meta div{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.22);border-radius:12px;padding:12px 15px}
+.hero-meta span{display:block;font-family:var(--display);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:.72rem;color:#9FD8F2;margin-bottom:3px}
+
+/* ---------- ROUTE NAV (TOC) ---------- */
+.route{margin-top:-30px;position:relative;z-index:3;background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid var(--border-soft);padding:22px 26px 18px}
+.route h2{font-size:1.05rem;color:var(--navy);text-transform:uppercase;letter-spacing:.08em;margin-bottom:16px}
+.route-line{display:flex;flex-wrap:wrap;gap:0;position:relative}
+.route-line:before{content:"";position:absolute;left:14px;right:14px;top:15px;height:3px;background:linear-gradient(90deg,var(--navy),var(--cyan));border-radius:3px;z-index:0}
+.stop{display:flex;flex-direction:column;align-items:flex-start;gap:8px;text-decoration:none;color:var(--ink);flex:1 1 190px;padding:0 14px 14px 14px;position:relative;z-index:1}
+.stop .dot{width:32px;height:32px;border-radius:50%;background:var(--surface);border:3px solid var(--navy);color:var(--navy);font-family:var(--display);font-weight:800;font-size:.82rem;display:flex;align-items:center;justify-content:center}
+.stop:nth-child(odd) .dot{border-color:var(--cyan);color:var(--cyan-deep)}
+.stop span.label{font-size:.86rem;font-weight:700;line-height:1.25}
+.print{text-align:right;margin:8px 2px 0}
+.print button{border:0;background:var(--navy);color:#fff;font-weight:700;border-radius:999px;padding:9px 16px;cursor:pointer;font-family:var(--body)}
+
+/* ---------- SECTIONS ---------- */
+section{margin:40px 0;background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--radius);overflow:hidden;box-shadow:0 8px 26px rgba(4,32,64,.07)}
+.section-head{padding:26px 30px 20px;border-bottom:1px solid var(--border-soft);position:relative}
+.section-head .eyebrow{display:inline-flex;align-items:center;gap:8px;font-family:var(--display);font-weight:800;letter-spacing:.12em;text-transform:uppercase;font-size:.76rem;color:var(--cyan-deep);margin-bottom:10px}
+.section-head .eyebrow .badge-num{width:26px;height:26px;border-radius:50%;background:var(--navy);color:#fff;font-size:.72rem;display:flex;align-items:center;justify-content:center}
+.section-head h2{font-size:clamp(1.4rem,2.4vw,1.95rem);color:var(--ink);margin-bottom:8px}
+.section-head p{margin:0;color:var(--ink-soft);max-width:70ch}
+.section-head:after{content:"";position:absolute;left:30px;right:30px;bottom:0;height:3px;background:linear-gradient(90deg,var(--navy),var(--cyan) 60%,transparent)}
+.section-body{padding:26px 30px 34px}
+
+.grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+@media(max-width:850px){.grid-2,.grid-3{grid-template-columns:1fr}.section-body,.section-head{padding-left:18px;padding-right:18px}.section-head:after{left:18px;right:18px}}
+
+.card{border:1px solid var(--border);border-radius:14px;padding:18px;background:var(--surface)}
+.accent{border-left:5px solid var(--navy)}
+.info{border-left:5px solid var(--cyan);background:var(--cyan-tint)}
+.warning{border-left:5px solid var(--amber);background:color-mix(in srgb, var(--amber) 10%, var(--surface))}
+.error{border-left:5px solid var(--red);background:color-mix(in srgb, var(--red) 8%, var(--surface))}
+.success{border-left:5px solid var(--green);background:color-mix(in srgb, var(--green) 9%, var(--surface))}
+.card h3{font-size:1.02rem;margin-bottom:6px;color:var(--ink)}
+.card h4{font-size:.94rem;margin-bottom:6px;color:var(--ink)}
+.card p,.card li{color:var(--ink-soft)}
+.note{border-left:4px solid var(--navy);background:var(--surface-2);border-radius:12px;padding:14px 16px;margin:18px 0;color:var(--ink-soft)}
+.note strong{color:var(--ink)}
+.file-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin:18px 0}
+.file-card{display:flex;align-items:center;gap:12px;border:1px solid var(--border);border-radius:12px;padding:13px 15px;background:var(--surface);text-decoration:none;color:var(--ink);transition:border-color .15s,transform .15s}
+.file-card:hover{border-color:var(--cyan);transform:translateY(-1px)}
+.file-card .ext{flex:none;width:38px;height:38px;border-radius:9px;background:var(--navy);color:#fff;font-family:var(--mono);font-size:.68rem;font-weight:700;display:flex;align-items:center;justify-content:center;letter-spacing:.02em}
+.file-card.sh .ext{background:var(--cyan-deep)}
+.file-card.md .ext{background:var(--amber)}
+.file-card.html .ext{background:var(--green)}
+.file-card .fname{font-family:var(--mono);font-size:.86rem;font-weight:700;display:block}
+.file-card .fdesc{font-size:.78rem;color:var(--ink-soft);display:block;margin-top:2px}
+.repo-cta{display:inline-flex;align-items:center;gap:10px;background:var(--navy);color:#fff;text-decoration:none;font-family:var(--display);font-weight:700;letter-spacing:.03em;padding:12px 20px;border-radius:999px;margin:6px 0 22px}
+.repo-cta:hover{background:var(--cyan-deep)}
+.pill{display:inline-block;background:var(--cyan-tint);color:var(--cyan-deep);border:1px solid var(--cyan);border-radius:999px;padding:3px 11px;font-size:.8rem;font-weight:700}
+
+.step{display:grid;grid-template-columns:52px 1fr;gap:16px;margin:22px 0;padding-bottom:22px;border-bottom:1px solid var(--border-soft)}
+.step:last-child{border-bottom:0;padding-bottom:0}
+.step .num{width:42px;height:42px;border-radius:12px;background:linear-gradient(160deg,var(--navy),var(--cyan-deep));color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:1.05rem;font-weight:800;box-shadow:0 6px 16px rgba(0,76,151,.28)}
+.step h3{font-size:1.06rem;margin-bottom:8px}
+
+code,pre{font-family:var(--mono)}
+pre{background:var(--code-bg);color:var(--code-ink);padding:16px 18px;border-radius:12px;overflow-x:auto;border-left:4px solid var(--cyan);font-size:.9rem;line-height:1.6}
+code{color:var(--navy-ink);background:var(--surface-2);padding:1px 6px;border-radius:5px}
+pre code{background:none;color:inherit;padding:0}
+.code-title{margin:14px 0 -6px;font-family:var(--display);font-size:.76rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#fff;background:var(--navy);display:inline-block;padding:5px 12px;border-radius:8px 8px 0 0}
+.kbd{font-family:var(--mono);background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:1px 7px;white-space:nowrap;font-size:.88rem}
+
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;margin:14px 0 20px;border:1px solid var(--border);border-radius:12px;overflow:hidden;font-variant-numeric:tabular-nums}
+th{background:var(--navy);color:#fff;text-align:left;font-family:var(--display);font-weight:700;letter-spacing:.02em;font-size:.86rem}
+th,td{padding:11px 13px;border-bottom:1px solid var(--border-soft);vertical-align:top}
+tr:nth-child(even) td{background:var(--surface-2)}
+td code{white-space:nowrap}
+
+.svg-wrap{background:#F7FBFF;border:1px solid var(--border);border-radius:16px;padding:16px;margin:18px 0;overflow-x:auto}
+.svg-wrap svg{width:100%;height:auto;min-width:720px;display:block}
+.repo-cta svg{width:16px;height:16px;flex:none}
+
+.footer{padding:40px 6vw;color:#EAF3FB;background:linear-gradient(160deg,var(--navy-deep),#001C38);margin-top:48px}
+.footer .foot-badge{display:flex;align-items:center;gap:14px;margin-bottom:10px}
+.footer .foot-badge .bus-badge{width:44px;height:44px;border-radius:11px}
+.footer .foot-badge .bus-badge svg{width:26px;height:26px}
+.footer h2{font-size:1.3rem;margin:0}
+.footer p{color:#9FC3DD;margin:4px 0}
+
+@media print{
+  .print{display:none}
+  section{break-inside:avoid;box-shadow:none}
+  pre{white-space:pre-wrap}
+  body{background:white}
+  .hero .stripe{display:none}
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="stripe"></div>
+  <div class="hero-top">
+    <div class="bus-badge">
+      <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="8" y="10" width="48" height="34" rx="6" fill="#fff"/>
+        <rect x="8" y="24" width="48" height="6" fill="#00A3E0"/>
+        <rect x="14" y="16" width="9" height="6" rx="1.5" fill="#00A3E0"/>
+        <rect x="27" y="16" width="9" height="6" rx="1.5" fill="#00A3E0"/>
+        <rect x="40" y="16" width="9" height="6" rx="1.5" fill="#00A3E0"/>
+        <circle cx="19" cy="47" r="6" fill="#062B4D"/>
+        <circle cx="45" cy="47" r="6" fill="#062B4D"/>
+        <circle cx="19" cy="47" r="2.4" fill="#fff"/>
+        <circle cx="45" cy="47" r="2.4" fill="#fff"/>
+      </svg>
+    </div>
+    <span class="hero-kicker">Proyecto integrador · Sistemas Distribuidos</span>
+  </div>
+  <h1>Sistema ATU de monitoreo de buses en tiempo real</h1>
+  <p class="lead">Guía técnica de la arquitectura real ya implementada: servidores TCP/HTTP en Java con failover, base de datos MariaDB, balanceo de carga con HAProxy, firewall con nftables y dashboard con mapa en vivo. Identidad visual alineada a los colores institucionales de la ATU (Autoridad de Transporte Urbano de Lima y Callao).</p>
+  <div class="hero-meta">
+    <div><span>Universidad</span>Universidad Norbert Wiener</div>
+    <div><span>Curso</span>Principios de los Sistemas de Software Distribuido</div>
+    <div><span>Entorno</span>Debian GNU/Linux 13 (Trixie) · 10.230.60.102</div>
+    <div><span>Stack</span>Java 21 · MariaDB · HAProxy · nftables · Leaflet.js</div>
+  </div>
+</header>
+
+<main class="container">
+  <nav class="route">
+    <h2>Ruta de la guía</h2>
+    <div class="route-line">
+      <a class="stop" href="#proposito"><span class="dot">01</span><span class="label">Propósito y objetivo</span></a>
+      <a class="stop" href="#arquitectura"><span class="dot">02</span><span class="label">Arquitectura general</span></a>
+      <a class="stop" href="#conceptos"><span class="dot">03</span><span class="label">Conceptos clave</span></a>
+      <a class="stop" href="#preparacion"><span class="dot">04</span><span class="label">Preparación Debian 13</span></a>
+      <a class="stop" href="#basedatos"><span class="dot">05</span><span class="label">Base de datos MariaDB</span></a>
+      <a class="stop" href="#servidor"><span class="dot">06</span><span class="label">Servidor y clientes Java</span></a>
+      <a class="stop" href="#seguridad"><span class="dot">07</span><span class="label">Seguridad: nftables</span></a>
+      <a class="stop" href="#haproxy"><span class="dot">08</span><span class="label">Alta disponibilidad: HAProxy</span></a>
+      <a class="stop" href="#dashboard"><span class="dot">09</span><span class="label">Dashboard web</span></a>
+      <a class="stop" href="#pruebas"><span class="dot">10</span><span class="label">Pruebas y evidencia</span></a>
+      <a class="stop" href="#cierre"><span class="dot">11</span><span class="label">Conclusiones</span></a>
+      <a class="stop" href="#referencias"><span class="dot">12</span><span class="label">Referencias</span></a>
+    </div>
+  </nav>
+
+  <section id="proposito">
+    <div class="section-head">
+      <span class="eyebrow"><span class="badge-num">01</span>Parada 01 · Objetivo</span>
+      <h2>Propósito y objetivo del proyecto</h2>
+      <p>Implementar un sistema distribuido real para la Autoridad de Transporte Urbano de Lima y Callao (ATU).</p>
+    </div>
+    <div class="section-body">
+      <div class="grid-3">
+        <div class="card accent"><h3>Objetivo</h3><p>Rastrear en tiempo real la posición de una flota de buses, almacenar el historial en base de datos y visualizarlo en un mapa web, garantizando que el servicio siga disponible aunque el servidor principal falle.</p></div>
+        <div class="card warning"><h3>Pregunta orientadora</h3><p>¿Qué pasa si el servidor que recibe el GPS de los buses se cae? ¿Cómo se protege el sistema de accesos no autorizados?</p></div>
+        <div class="card success"><h3>Resultado logrado</h3><p>Servidor Java con instancia principal y de respaldo, balanceo automático con HAProxy, firewall nftables y dashboard Leaflet.js mostrando los buses en <code>http://10.230.60.102:7070/dashboard.html</code>.</p></div>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>Componente</th><th>Rol en el sistema</th></tr></thead><tbody>
+        <tr><td><strong>BusCliente.java</strong></td><td>Simula la flota de buses (BUS-101 a BUS-606), enviando GPS cada 3 segundos.</td></tr>
+        <tr><td><strong>ServidorATU.java</strong></td><td>Recibe ubicaciones por TCP, las guarda en MariaDB y expone una API HTTP/JSON.</td></tr>
+        <tr><td><strong>MariaDB</strong></td><td>Persiste el historial de ubicaciones en la tabla <code>ubicaciones</code>.</td></tr>
+        <tr><td><strong>HAProxy</strong></td><td>Balancea tráfico entre el servidor principal y el de respaldo; failover automático.</td></tr>
+        <tr><td><strong>nftables</strong></td><td>Firewall con política DROP y whitelist de puertos.</td></tr>
+        <tr><td><strong>dashboard.html</strong></td><td>Mapa Leaflet.js que consume la API y muestra los buses en tiempo real.</td></tr>
+      </tbody></table></div>
+    </div>
+  </section>
+
+  <section id="arquitectura">
+    <div class="section-head">
+      <span class="eyebrow"><span class="badge-num">02</span>Parada 02 · Vista general</span>
+      <h2>Arquitectura general del sistema</h2>
+      <p>Los buses nunca hablan directo con la base de datos; todo el tráfico pasa por HAProxy antes de llegar al servidor activo.</p>
+    </div>
+    <div class="section-body">
+      <div class="svg-wrap"><svg viewBox="0 0 1160 560" aria-label="Arquitectura del sistema ATU">
+        <defs>
+          <marker id="a1" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#004C97"/></marker>
+          <marker id="a2" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#C43D3D"/></marker>
+          <marker id="a3" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#00A3E0"/></marker>
+          <filter id="sh"><feDropShadow dx="0" dy="6" stdDeviation="5" flood-opacity=".14"/></filter>
+        </defs>
+        <rect x="20" y="20" width="1120" height="520" rx="24" fill="#FFFFFF" stroke="#D8E4F0"/>
+        <text x="52" y="62" font-size="22" font-weight="800" fill="#004C97" font-family="Arial">Sistema ATU en producción (10.230.60.102)</text>
+        <text x="52" y="90" font-size="14" fill="#4C6A88" font-family="Arial">Todo el tráfico de buses y del dashboard pasa por HAProxy antes de llegar al servidor activo.</text>
+        <rect x="55" y="150" width="185" height="100" rx="14" fill="#fff" stroke="#00A3E0" stroke-width="3" filter="url(#sh)"/><text x="147" y="188" text-anchor="middle" font-size="15" font-weight="800" font-family="Arial">6 Buses</text><text x="147" y="210" text-anchor="middle" font-size="12" fill="#4C6A88" font-family="Arial">BUS-101 ... BUS-606</text><text x="147" y="230" text-anchor="middle" font-size="12" fill="#4C6A88" font-family="Arial">GPS cada 3s</text>
+        <rect x="300" y="150" width="175" height="100" rx="14" fill="#E4F6FC" stroke="#00A3E0" stroke-width="3" filter="url(#sh)"/><text x="387" y="188" text-anchor="middle" font-size="15" font-weight="800" font-family="Arial">HAProxy</text><text x="387" y="210" text-anchor="middle" font-size="12" fill="#0B2A4A" font-family="Arial">TCP :9000</text><text x="387" y="230" text-anchor="middle" font-size="12" fill="#0B2A4A" font-family="Arial">HTTP :9001 · stats :9999</text>
+        <rect x="545" y="90" width="220" height="80" rx="14" fill="#F3F7FC" stroke="#004C97" stroke-width="3" filter="url(#sh)"/><text x="655" y="123" text-anchor="middle" font-size="15" font-weight="800" font-family="Arial">ServidorATU Principal</text><text x="655" y="145" text-anchor="middle" font-size="12" fill="#4C6A88" font-family="Arial">TCP :5050 · HTTP :8080</text>
+        <rect x="545" y="230" width="220" height="80" rx="14" fill="#F3F7FC" stroke="#004C97" stroke-width="3" stroke-dasharray="6 4" filter="url(#sh)"/><text x="655" y="263" text-anchor="middle" font-size="15" font-weight="800" font-family="Arial">ServidorATU Respaldo</text><text x="655" y="285" text-anchor="middle" font-size="12" fill="#4C6A88" font-family="Arial">TCP :5051 · HTTP :8081</text>
+        <rect x="850" y="160" width="200" height="90" rx="14" fill="#fff" stroke="#004C97" stroke-width="3" filter="url(#sh)"/><text x="950" y="196" text-anchor="middle" font-size="15" font-weight="800" font-family="Arial">MariaDB :3306</text><text x="950" y="218" text-anchor="middle" font-size="12" fill="#4C6A88" font-family="Arial">atu_monitoreo.ubicaciones</text>
+        <rect x="300" y="400" width="175" height="90" rx="14" fill="#fff" stroke="#C97D0F" stroke-width="3" filter="url(#sh)"/><text x="387" y="436" text-anchor="middle" font-size="15" font-weight="800" font-family="Arial">nftables</text><text x="387" y="458" text-anchor="middle" font-size="12" fill="#4C6A88" font-family="Arial">policy DROP + whitelist</text>
+        <rect x="850" y="400" width="230" height="90" rx="14" fill="#E4F6FC" stroke="#00A3E0" stroke-width="3" filter="url(#sh)"/><text x="965" y="433" text-anchor="middle" font-size="15" font-weight="800" font-family="Arial">Dashboard :7070</text><text x="965" y="455" text-anchor="middle" font-size="12" fill="#0B2A4A" font-family="Arial">Leaflet.js · fetch /buses cada 3s</text>
+        <line x1="240" y1="200" x2="300" y2="200" stroke="#004C97" stroke-width="4" marker-end="url(#a1)"/>
+        <line x1="475" y1="185" x2="545" y2="145" stroke="#004C97" stroke-width="4" marker-end="url(#a1)"/>
+        <line x1="475" y1="220" x2="545" y2="270" stroke="#004C97" stroke-width="4" stroke-dasharray="5 4" marker-end="url(#a1)"/>
+        <line x1="765" y1="140" x2="850" y2="195" stroke="#00A3E0" stroke-width="4" marker-end="url(#a3)"/>
+        <line x1="765" y1="260" x2="850" y2="215" stroke="#00A3E0" stroke-width="4" stroke-dasharray="5 4" marker-end="url(#a3)"/>
+        <line x1="765" y1="150" x2="965" y2="400" stroke="#C43D3D" stroke-width="3" stroke-dasharray="6 5" marker-end="url(#a2)"/><text x="800" y="330" font-size="12" fill="#C43D3D" font-weight="700" font-family="Arial">HTTP :9001 → /buses (JSON)</text>
+        <text x="655" y="80" text-anchor="middle" font-size="12" fill="#4C6A88" font-weight="700" font-family="Arial">round-robin + health check /health cada 2s</text>
+        <text x="387" y="500" text-anchor="middle" font-size="12" fill="#4C6A88" font-family="Arial">Permite solo 22, 5050/5051, 8080/8081, 9000, 7070</text>
+      </svg></div>
+      <div class="note"><strong>Nota:</strong> los buses y el dashboard nunca apuntan directamente al servidor principal o de respaldo; siempre hablan con HAProxy, que decide a cuál instancia reenviar la conexión.</div>
+    </div>
+  </section>
+
+  <section id="conceptos">
+    <div class="section-head">
+      <span class="eyebrow"><span class="badge-num">03</span>Parada 03 · Fundamentos</span>
+      <h2>Conceptos clave del sistema</h2>
+      <p>Cuatro ideas sostienen el proyecto: comunicación TCP, API REST, balanceo/failover y firewall perimetral.</p>
+    </div>
+    <div class="section-body">
+      <div class="grid-2">
+        <div class="card info"><h3>TCP multihilo (buses → servidor)</h3><p>Cada bus abre un <code>Socket</code> contra el servidor y envía texto plano <code>ID_BUS|lat|lon</code> cada 3 segundos. <code>ServidorATU</code> usa un <code>ExecutorService</code> con pool de hilos para atender varios buses a la vez sin que uno bloquee a otro.</p></div>
+        <div class="card info"><h3>API HTTP/JSON (servidor → dashboard)</h3><p>El mismo proceso Java expone <code>com.sun.net.httpserver.HttpServer</code> con las rutas <code>/buses</code> (últimas posiciones), <code>/health</code> (para HAProxy) y <code>/stats</code> (métricas del propio servidor).</p></div>
+      </div>
+      <div class="grid-2">
+        <div class="card warning"><h3>Balanceo y failover (HAProxy)</h3><p>HAProxy expone un único punto de entrada (:9000 TCP, :9001 HTTP) y reparte hacia el servidor principal o el de respaldo. Si el principal deja de responder al <code>health check</code>, HAProxy lo saca de la rotación automáticamente.</p></div>
+        <div class="card warning"><h3>Firewall perimetral (nftables)</h3><p>Política <code>DROP</code> por defecto: todo el tráfico entrante se bloquea salvo los puertos explícitamente permitidos (SSH, TCP/HTTP de ambas instancias, HAProxy y dashboard).</p></div>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>Necesidad del sistema</th><th>Mecanismo</th><th>Motivo</th></tr></thead><tbody>
+        <tr><td>Enviar GPS del bus</td><td>TCP (Socket)</td><td>Conexión persistente, mensajes cortos y frecuentes.</td></tr>
+        <tr><td>Consultar posiciones para el mapa</td><td>HTTP/JSON</td><td>El navegador consume JSON fácilmente con <code>fetch()</code>.</td></tr>
+        <tr><td>Seguir funcionando si un servidor cae</td><td>HAProxy + health check</td><td>Failover transparente sin intervención manual.</td></tr>
+        <tr><td>Evitar accesos no autorizados</td><td>nftables policy DROP</td><td>Solo los puertos necesarios quedan expuestos.</td></tr>
+      </tbody></table></div>
+    </div>
+  </section>
+
+  <section id="preparacion">
+    <div class="section-head">
+      <span class="eyebrow"><span class="badge-num">04</span>Parada 04 · Entorno</span>
+      <h2>Preparación del entorno Debian 13</h2>
+      <p>Instalación de todos los paquetes que sostienen el sistema, tal como se hizo en el servidor real.</p>
+    </div>
+    <div class="section-body">
+      <div class="step"><div class="num">1</div><div><h3>Actualizar el sistema</h3><pre><code>sudo apt update
+sudo apt upgrade -y</code></pre></div></div>
+      <div class="step"><div class="num">2</div><div><h3>Instalar el stack completo</h3><pre><code>sudo apt-get install -y openjdk-21-jdk mariadb-server haproxy nftables git net-tools</code></pre>
+        <p><strong>Versiones verificadas en el servidor (10.230.60.102):</strong></p>
+        <div class="table-wrap"><table><thead><tr><th>Paquete</th><th>Versión</th></tr></thead><tbody>
+          <tr><td>OpenJDK</td><td>21.0.11 (build 10-1-deb13u2)</td></tr>
+          <tr><td>MariaDB</td><td>11.8.6-MariaDB</td></tr>
+          <tr><td>HAProxy</td><td>3.0.11-1+deb13u3</td></tr>
+          <tr><td>nftables</td><td>v1.1.3</td></tr>
+          <tr><td>git</td><td>2.47.3</td></tr>
+          <tr><td>net-tools</td><td>2.10</td></tr>
+        </tbody></table></div>
+      </div></div>
+      <div class="step"><div class="num">3</div><div><h3>Crear la carpeta del proyecto</h3><pre><code>mkdir -p ~/atu_proyecto
+cd ~/atu_proyecto
+git init</code></pre><p>Aquí viven <code>ServidorATU.java</code>, <code>BusCliente.java</code>, <code>dashboard.html</code>, <code>mysql-connector-j.jar</code> y los scripts <code>iniciar_atu.sh</code> / <code>detener_atu.sh</code>.</p></div></div>
+    </div>
+  </section>
+
+  <section id="basedatos">
+    <div class="section-head">
+      <span class="eyebrow"><span class="badge-num">05</span>Parada 05 · Persistencia</span>
+      <h2>Base de datos MariaDB</h2>
+      <p>Toda ubicación reportada por un bus queda registrada con marca de tiempo automática.</p>
+    </div>
+    <div class="section-body">
+      <div class="step"><div class="num">1</div><div><h3>Crear base de datos, tabla y usuario de aplicación</h3><pre><code>sudo mysql -u root
+
+CREATE DATABASE atu_monitoreo CHARACTER SET utf8mb4;
+
+CREATE TABLE ubicaciones (
+    id        INT AUTO_INCREMENT PRIMARY KEY,
+    id_bus    VARCHAR(20) NOT NULL,
+    latitud   DECIMAL(10,8) NOT NULL,
+    longitud  DECIMAL(11,8) NOT NULL,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE USER 'atu_app'@'localhost' IDENTIFIED BY 'atu_secure_2024';
+GRANT ALL PRIVILEGES ON atu_monitoreo.* TO 'atu_app'@'localhost';
+FLUSH PRIVILEGES;</code></pre><p><strong>Por qué un usuario aparte:</strong> <code>atu_app</code> solo tiene permisos sobre <code>atu_monitoreo</code>, nunca se conecta como <code>root</code> desde el código Java.</p></div></div>
+      <div class="step"><div class="num">2</div><div><h3>Estructura resultante de la tabla</h3>
+        <div class="table-wrap"><table><thead><tr><th>Campo</th><th>Tipo</th><th>Clave</th><th>Extra</th></tr></thead><tbody>
+          <tr><td>id</td><td>int(11)</td><td>PRI</td><td>auto_increment</td></tr>
+          <tr><td>id_bus</td><td>varchar(20)</td><td>MUL</td><td>—</td></tr>
+          <tr><td>latitud</td><td>decimal(10,8)</td><td>—</td><td>—</td></tr>
+          <tr><td>longitud</td><td>decimal(11,8)</td><td>—</td><td>—</td></tr>
+          <tr><td>timestamp</td><td>datetime</td><td>MUL</td><td>current_timestamp()</td></tr>
+        </tbody></table></div>
+        <p>Con 6 buses enviando cada 3 segundos se generan aproximadamente <strong>120 registros por minuto</strong>. La consulta que usa el dashboard agrupa por bus para quedarse solo con la posición más reciente:</p>
+        <pre><code>SELECT id_bus, latitud, longitud, MAX(timestamp) as ultima
+FROM ubicaciones
+GROUP BY id_bus
+ORDER BY ultima DESC;</code></pre>
+      </div></div>
+    </div>
+  </section>
+
+  <section id="servidor">
+    <div class="section-head">
+      <span class="eyebrow"><span class="badge-num">06</span>Parada 06 · Núcleo Java</span>
+      <h2>Servidor y clientes en Java</h2>
+      <p>El corazón del sistema: <code>ServidorATU.java</code> escucha buses por TCP y responde al dashboard por HTTP; <code>BusCliente.java</code> simula la flota.</p>
+    </div>
+    <div class="section-body">
+      <div class="svg-wrap"><svg viewBox="0 0 1100 340" aria-label="Flujo TCP bus a servidor">
+        <defs><marker id="at" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#00A3E0"/></marker><filter id="st"><feDropShadow dx="0" dy="6" stdDeviation="5" flood-opacity=".14"/></filter></defs>
+        <rect x="20" y="20" width="1060" height="300" rx="22" fill="#FFFFFF" stroke="#D8E4F0"/><text x="52" y="60" font-size="20" font-weight="800" fill="#004C97" font-family="Arial">Ciclo de vida de un reporte GPS</text>
+        <rect x="60" y="120" width="190" height="100" rx="14" fill="#fff" stroke="#00A3E0" stroke-width="3" filter="url(#st)"/><text x="155" y="160" text-anchor="middle" font-size="15" font-weight="800" font-family="Arial">BusCliente.java</text><text x="155" y="182" text-anchor="middle" font-size="12" fill="#4C6A88" font-family="Arial">BUS-101|-12.03|-77.04</text>
+        <rect x="335" y="120" width="220" height="100" rx="14" fill="#E4F6FC" stroke="#00A3E0" stroke-width="3" filter="url(#st)"/><text x="445" y="155" text-anchor="middle" font-size="15" font-weight="800" font-family="Arial">manejarCliente()</text><text x="445" y="177" text-anchor="middle" font-size="12" fill="#0B2A4A" font-family="Arial">valida y parsea</text>
+        <rect x="640" y="120" width="190" height="100" rx="14" fill="#F3F7FC" stroke="#004C97" stroke-width="3" filter="url(#st)"/><text x="735" y="155" text-anchor="middle" font-size="15" font-weight="800" font-family="Arial">guardarUbicacion()</text><text x="735" y="177" text-anchor="middle" font-size="12" fill="#4C6A88" font-family="Arial">INSERT en MariaDB</text>
+        <rect x="905" y="120" width="150" height="100" rx="14" fill="#fff" stroke="#1E8A5B" stroke-width="3" filter="url(#st)"/><text x="980" y="160" text-anchor="middle" font-size="15" font-weight="800" font-family="Arial">Respuesta</text><text x="980" y="182" text-anchor="middle" font-size="12" fill="#1E8A5B" font-family="Arial">OK|id_bus|ts</text>
+        <line x1="250" y1="170" x2="335" y2="170" stroke="#00A3E0" stroke-width="4" marker-end="url(#at)"/><line x1="555" y1="170" x2="640" y2="170" stroke="#00A3E0" stroke-width="4" marker-end="url(#at)"/><line x1="830" y1="170" x2="905" y2="170" stroke="#00A3E0" stroke-width="4" marker-end="url(#at)"/>
+        <text x="550" y="270" text-anchor="middle" font-size="13" fill="#4C6A88" font-family="Arial">El bus repite este ciclo cada 3 segundos, indefinidamente.</text>
+      </svg></div>
+
+      <div class="step"><div class="num">1</div><div><h3>Compilar el servidor y el cliente</h3><pre><code>cd ~/atu_proyecto
+javac -cp .:mysql-connector-j.jar ServidorATU.java
+javac BusCliente.java</code></pre>
+        <div class="table-wrap"><table><thead><tr><th>Archivo</th><th>Tamaño</th><th>Clase compilada</th><th>Java SE</th></tr></thead><tbody>
+          <tr><td>ServidorATU.java</td><td>6.1K</td><td>ServidorATU.class</td><td>21</td></tr>
+          <tr><td>BusCliente.java</td><td>2.0K</td><td>BusCliente.class</td><td>21</td></tr>
+          <tr><td>mysql-connector-j</td><td>2.4MB</td><td>JDBC Driver v8.3.0</td><td>—</td></tr>
+        </tbody></table></div>
+      </div></div>
+
+      <div class="step"><div class="num">2</div><div><h3>Configuración y arranque de dos instancias (principal + respaldo)</h3><pre><code>static final String DB_URL  = "jdbc:mysql://localhost:3306/atu_monitoreo";
+static final String DB_USER = "atu_app";
+static final String DB_PASS = "atu_secure_2024";
+
+static int TCP_PORT  = 5050;
+static int HTTP_PORT = 8080;
+
+public static void main(String[] args) throws Exception {
+    if (args.length > 0) TCP_PORT  = Integer.parseInt(args[0]);
+    if (args.length > 1) HTTP_PORT = Integer.parseInt(args[1]);
+
+    new Thread(() -> iniciarTCP()).start();  // TCP en hilo aparte
+    iniciarHTTP();                            // HTTP en el hilo principal
+}</code></pre><p>Los puertos son argumentos, por eso se puede levantar una segunda instancia sin tocar el código:</p><pre><code># Terminal 1: instancia principal
+java -cp .:mysql-connector-j.jar ServidorATU 5050 8080
+
+# Terminal 2: instancia de respaldo
+java -cp .:mysql-connector-j.jar ServidorATU 5051 8081</code></pre></div></div>
+
+      <div class="step"><div class="num">3</div><div><h3>Atención concurrente de buses (TCP)</h3><pre><code>static void iniciarTCP() {
+    try (ServerSocket ss = new ServerSocket(TCP_PORT)) {
+        ExecutorService pool = Executors.newCachedThreadPool();
+        while (true) {
+            Socket cliente = ss.accept();
+            pool.submit(() -> manejarCliente(cliente));
+        }
+    }
+}
+
+static void manejarCliente(Socket socket) {
+    ...
+    String[] partes = linea.split("\\|");
+    if (partes.length == 3) {
+        String idBus    = partes[0].trim();
+        double latitud  = Double.parseDouble(partes[1].trim());
+        double longitud = Double.parseDouble(partes[2].trim());
+        guardarUbicacion(idBus, latitud, longitud);
+        pw.println("OK|" + idBus + "|" + System.currentTimeMillis());
+    } else {
+        pw.println("ERROR|SE_ESPERAN_3_CAMPOS");
+    }
+}</code></pre><p><strong>Por qué un pool de hilos:</strong> los 6 buses se conectan al mismo tiempo; sin <code>ExecutorService</code>, el servidor solo podría atender a uno mientras los demás esperan en fila.</p></div></div>
+
+      <div class="step"><div class="num">4</div><div><h3>API HTTP para el dashboard</h3><pre><code>server.createContext("/buses", exchange -> {
+    String json = obtenerUltimasUbicaciones();
+    exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
+    exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+    exchange.sendResponseHeaders(200, respuesta.length);
+    ...
+});
+
+server.createContext("/health", exchange -> {
+    byte[] ok = "OK".getBytes();
+    exchange.sendResponseHeaders(200, ok.length);
+    ...
+});</code></pre><p><code>/buses</code> alimenta el mapa; <code>/health</code> existe solo para que HAProxy verifique si la instancia sigue viva.</p></div></div>
+
+      <div class="step"><div class="num">5</div><div><h3>Ejecutar la flota completa</h3><p>El script <code>iniciar_atu.sh</code> ya automatiza todo el arranque:</p><pre><code>cd ~/atu_proyecto
+./iniciar_atu.sh</code></pre>
+        <div class="table-wrap"><table><thead><tr><th>Paso</th><th>Acción</th></tr></thead><tbody>
+          <tr><td>1/6</td><td>Inicia MariaDB</td></tr>
+          <tr><td>2/6</td><td>Inicia HAProxy</td></tr>
+          <tr><td>3/6</td><td>Levanta ServidorATU principal (TCP :5050 / HTTP :8080)</td></tr>
+          <tr><td>4/6</td><td>Levanta ServidorATU respaldo (TCP :5051 / HTTP :8081)</td></tr>
+          <tr><td>5/6</td><td>Sirve el dashboard con <code>python3 -m http.server 7070</code></td></tr>
+          <tr><td>6/6</td><td>Lanza BUS-101 a BUS-606 apuntando a <code>localhost:5050</code></td></tr>
+        </tbody></table></div>
+        <p>Para detener todo: <code>./detener_atu.sh</code>.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <section id="seguridad">
+    <div class="section-head">
+      <span class="eyebrow"><span class="badge-num">07</span>Parada 07 · Perímetro</span>
+      <h2>Seguridad: firewall con nftables</h2>
+      <p>Política DROP por defecto: se bloquea todo el tráfico entrante salvo lo explícitamente permitido.</p>
+    </div>
+    <div class="section-body">
+      <div class="step"><div class="num">1</div><div><h3>Configuración aplicada (<code>/etc/nftables.conf</code>)</h3><pre><code>table inet filter {
+    chain input {
+        type filter hook input priority filter; policy DROP;
+        iif "lo" accept
+        ct state established,related accept
+        ip protocol icmp accept
+        tcp dport 22 accept      # SSH administración
+        tcp dport 5050 accept    # Servidor TCP principal
+        tcp dport 8080 accept    # HTTP API principal
+        tcp dport 9000 accept    # HAProxy TCP
+        tcp dport 5051 accept    # Servidor TCP respaldo
+        tcp dport 8081 accept    # HTTP API respaldo
+        tcp dport 7070 accept    # Dashboard web
+        log prefix "[NFT DROP] " drop
+    }
+    chain forward { policy drop; }
+    chain output  { policy accept; }
+}</code></pre></div></div>
+      <div class="step"><div class="num">2</div><div><h3>Aplicar y habilitar</h3><pre><code>sudo cp nftables.conf /etc/nftables.conf
+sudo systemctl enable nftables
+sudo systemctl restart nftables
+sudo nft list ruleset</code></pre></div></div>
+      <div class="table-wrap"><table><thead><tr><th>Puerto</th><th>¿Para qué?</th></tr></thead><tbody>
+        <tr><td>22</td><td>SSH (administración remota)</td></tr>
+        <tr><td>5050 / 5051</td><td>Buses → Servidor TCP (principal / respaldo)</td></tr>
+        <tr><td>8080 / 8081</td><td>Dashboard → Servidor HTTP (principal / respaldo)</td></tr>
+        <tr><td>9000 / 9001 / 9999</td><td>HAProxy TCP / HTTP / panel de estadísticas</td></tr>
+        <tr><td>7070</td><td>Navegador → Dashboard web</td></tr>
+      </tbody></table></div>
+      <div class="note"><strong>Por qué importa:</strong> si alguien externo intenta conectarse a un puerto no listado (por ejemplo 3306, MariaDB), el firewall lo descarta en silencio, sin siquiera responder.</div>
+    </div>
+  </section>
+
+  <section id="haproxy">
+    <div class="section-head">
+      <span class="eyebrow"><span class="badge-num">08</span>Parada 08 · Resiliencia</span>
+      <h2>Alta disponibilidad con HAProxy</h2>
+      <p>El problema a resolver: si el servidor principal se cae, ningún bus debería perder conexión.</p>
+    </div>
+    <div class="section-body">
+      <div class="svg-wrap"><svg viewBox="0 0 1100 380" aria-label="Failover HAProxy">
+        <defs><marker id="af" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#1E8A5B"/></marker><marker id="ax" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#C43D3D"/></marker><filter id="sf"><feDropShadow dx="0" dy="6" stdDeviation="5" flood-opacity=".14"/></filter></defs>
+        <rect x="20" y="20" width="1060" height="340" rx="22" fill="#FFFFFF" stroke="#D8E4F0"/><text x="52" y="58" font-size="19" font-weight="800" fill="#004C97" font-family="Arial">Antes y después de la caída del servidor principal</text>
+        <text x="52" y="100" font-size="13" font-weight="800" fill="#1E8A5B" font-family="Arial">NORMAL</text><rect x="60" y="115" width="150" height="70" rx="10" fill="#fff" stroke="#00A3E0" stroke-width="2" filter="url(#sf)"/><text x="135" y="155" text-anchor="middle" font-size="13" font-weight="700" font-family="Arial">HAProxy :9000</text><rect x="280" y="115" width="180" height="70" rx="10" fill="#F2FFF8" stroke="#1E8A5B" stroke-width="2" filter="url(#sf)"/><text x="370" y="150" text-anchor="middle" font-size="13" font-weight="700" font-family="Arial">Principal :5050</text><text x="370" y="170" text-anchor="middle" font-size="11" fill="#1E8A5B" font-family="Arial">✓ activo</text><line x1="210" y1="150" x2="280" y2="150" stroke="#1E8A5B" stroke-width="4" marker-end="url(#af)"/>
+        <text x="52" y="240" font-size="13" font-weight="800" fill="#C43D3D" font-family="Arial">PRINCIPAL CAÍDO (~6s después)</text><rect x="60" y="255" width="150" height="70" rx="10" fill="#fff" stroke="#00A3E0" stroke-width="2" filter="url(#sf)"/><text x="135" y="295" text-anchor="middle" font-size="13" font-weight="700" font-family="Arial">HAProxy :9000</text><rect x="280" y="255" width="180" height="70" rx="10" fill="#FFF4F2" stroke="#C43D3D" stroke-width="2" stroke-dasharray="5 4" filter="url(#sf)"/><text x="370" y="290" text-anchor="middle" font-size="13" font-weight="700" font-family="Arial">Principal :5050</text><text x="370" y="310" text-anchor="middle" font-size="11" fill="#C43D3D" font-family="Arial">✗ sin respuesta</text><rect x="510" y="255" width="180" height="70" rx="10" fill="#F2FFF8" stroke="#1E8A5B" stroke-width="2" filter="url(#sf)"/><text x="600" y="290" text-anchor="middle" font-size="13" font-weight="700" font-family="Arial">Respaldo :5051</text><text x="600" y="310" text-anchor="middle" font-size="11" fill="#1E8A5B" font-family="Arial">✓ recibe tráfico</text><line x1="210" y1="290" x2="510" y2="290" stroke="#1E8A5B" stroke-width="4" marker-end="url(#af)"/><line x1="370" y1="255" x2="370" y2="225" stroke="#C43D3D" stroke-width="3" marker-end="url(#ax)"/>
+        <text x="850" y="200" font-size="13" fill="#4C6A88" font-family="Arial">health check GET /health</text><text x="850" y="220" font-size="13" fill="#4C6A88" font-family="Arial">cada 2s · 3 fallos = caído</text>
+      </svg></div>
+
+      <div class="step"><div class="num">1</div><div><h3>Configuración (<code>/etc/haproxy/haproxy.cfg</code>)</h3><p><strong>Frontend TCP :9000</strong> → backend round-robin: principal <code>localhost:5050</code> (health check cada 2s) y respaldo <code>localhost:5051</code> (solo si el principal cae).</p><p><strong>Frontend HTTP :9001</strong> → backend round-robin: principal <code>localhost:8080</code> (health check <code>GET /health</code>) y respaldo <code>localhost:8081</code>.</p><p><strong>Panel de estadísticas:</strong> <code>http://10.230.60.102:9999/stats</code></p></div></div>
+      <div class="step"><div class="num">2</div><div><h3>Prueba de failover realizada</h3><ol><li>Se terminó el proceso del servidor principal con <code>kill &lt;PID&gt;</code>.</li><li>HAProxy detectó la caída vía health check (intervalo 2s, umbral 3 fallos).</li><li>A los ~6 segundos, el tráfico se redirigió automáticamente al respaldo (:8081).</li><li>El endpoint <code>/buses</code> siguió respondiendo sin interrupción, ahora desde el respaldo.</li><li>Al restaurar el principal, HAProxy lo reincorporó a la rotación automáticamente.</li></ol>
+      <pre><code>[ANTES]   curl http://localhost:9001/buses  →  HTTP 200 (desde :8080)
+[FALLA]   kill &lt;PID servidor principal&gt;
+[ESPERA]  HAProxy detecta la caída (~6s)
+[DESPUÉS] curl http://localhost:9001/buses  →  HTTP 200 (desde :8081 RESPALDO)
+[RESULTADO] Servicio continuó sin interrupción ✓</code></pre></div></div>
+    </div>
+  </section>
+
+  <section id="dashboard">
+    <div class="section-head">
+      <span class="eyebrow"><span class="badge-num">09</span>Parada 09 · Visualización</span>
+      <h2>Dashboards web con Leaflet.js</h2>
+      <p>Tres vistas sobre los mismos datos: mapa en vivo, panel técnico y consulta para el pasajero.</p>
+    </div>
+    <div class="section-body">
+      <div class="grid-3">
+        <div class="card info"><h3>1. <code>dashboard.html</code> — Mapa en vivo</h3><p>Cada 3 segundos llama a <code>fetch('/buses')</code> (vía HAProxy <code>:9001</code>) y mueve los marcadores sobre OpenStreetMap. Incluye trayectorias históricas (últimos 20 puntos) y lista lateral de buses activos.</p></div>
+        <div class="card accent"><h3>2. <code>dashboard2.html</code> — Panel de control</h3><p>Vista técnica para el administrador: KPIs de mensajes TCP recibidos, uptime, estado de cada nodo (buses, HAProxy, servidores, MariaDB) y log de eventos en tiempo real.</p></div>
+        <div class="card success"><h3>3. <code>dashboard3.html</code> — Consulta de viaje</h3><p>Simulador para el pasajero: elige bus, paradero de origen/destino y condición de tráfico; estima tiempo de espera (con GPS real del bus) y tiempo de viaje, con mini-mapa de referencia.</p></div>
+      </div>
+      <div class="note"><strong>Navegación:</strong> los tres dashboards están enlazados entre sí desde su barra superior, así que basta con abrir <code>dashboard.html</code> y moverse entre vistas con un clic.</div>
+      <p><strong>Servido con:</strong></p><pre><code>python3 -m http.server 7070 --bind 0.0.0.0
+# http://10.230.60.102:7070/dashboard.html</code></pre>
+      <div class="code-title">Ejemplo de respuesta que consumen los tres dashboards</div>
+      <pre><code>[
+  {"id_bus":"BUS-101","latitud":-12.022660,"longitud":-77.047640,"timestamp":"2026-06-22 03:30:58"},
+  {"id_bus":"BUS-202","latitud":-12.063286,"longitud":-77.052309,"timestamp":"2026-06-22 03:30:58"},
+  {"id_bus":"BUS-303","latitud":-12.030169,"longitud":-77.048884,"timestamp":"2026-06-22 03:30:57"}
+]</code></pre>
+      <div class="note"><strong>Sobre la simulación de tiempo de viaje:</strong> <code>dashboard3.html</code> calcula la distancia entre paraderos con la fórmula de Haversine y un factor de corrección por trazado de calles (no es ruteo real de calles ni considera semáforos o tránsito real); es un ejercicio educativo que cierra el rol de "aplicación de pasajero" de la arquitectura distribuida.</div>
+    </div>
+  </section>
+
+  <section id="pruebas">
+    <div class="section-head">
+      <span class="eyebrow"><span class="badge-num">10</span>Parada 10 · Verificación</span>
+      <h2>Pruebas y evidencia recolectada</h2>
+      <p>Resultados observados al ejecutar el sistema completo.</p>
+    </div>
+    <div class="section-body">
+      <div class="table-wrap"><table><thead><tr><th>Puerto</th><th>Proceso</th><th>Descripción</th></tr></thead><tbody>
+        <tr><td>3306</td><td>mariadbd</td><td>Base de datos MariaDB</td></tr>
+        <tr><td>5050</td><td>java</td><td>ServidorATU TCP principal</td></tr>
+        <tr><td>5051</td><td>java</td><td>ServidorATU TCP respaldo</td></tr>
+        <tr><td>8080</td><td>java</td><td>ServidorATU HTTP principal</td></tr>
+        <tr><td>8081</td><td>java</td><td>ServidorATU HTTP respaldo</td></tr>
+        <tr><td>9000</td><td>haproxy</td><td>Balanceador TCP</td></tr>
+        <tr><td>9001</td><td>haproxy</td><td>Balanceador HTTP</td></tr>
+        <tr><td>9999</td><td>haproxy</td><td>Panel de estadísticas</td></tr>
+        <tr><td>7070</td><td>python3</td><td>Servidor del dashboard web</td></tr>
+      </tbody></table></div>
+      <div class="code-title">Logs de un ciclo real (servidor + bus)</div>
+      <pre><code>[ATU] Servidor iniciando...
+[TCP] Escuchando en puerto 5050
+[HTTP] Servidor HTTP activo en puerto 8080
+[TCP] Recibido de 127.0.0.1: BUS-101|-12.035547|-77.036307
+[DB]  Guardado: Bus=BUS-101 lat=-12.035547 lon=-77.036307
+
+[BUS-101] Enviado: BUS-101|-12.035547|-77.036307
+[BUS-101] Respuesta: OK|BUS-101|1782113970666</code></pre>
+      <div class="grid-2">
+        <div class="card accent"><h3>Evidencias recomendadas para el informe</h3><ul><li>Captura de <code>systemctl status mariadb/haproxy/nftables</code> como <span class="pill">active running</span>.</li><li>Captura de <code>./iniciar_atu.sh</code> completando los 6 pasos.</li><li>Captura del dashboard mostrando los buses moviéndose.</li><li>Captura del panel HAProxy en <code>:9999/stats</code>.</li><li>Captura del failover: <code>kill</code> al principal y respuesta ininterrumpida en <code>:9001/buses</code>.</li></ul></div>
+        <div class="card warning"><h3>Preguntas de cierre</h3><ol><li>¿Qué pasaría si dos buses distintos usan el mismo <code>id_bus</code>?</li><li>¿Por qué el servidor no habla directo con el dashboard sin pasar por HAProxy?</li><li>¿Qué protege exactamente la política <code>DROP</code> de nftables?</li><li>¿Qué pasaría si <code>/health</code> tardara más de 2 segundos en responder bajo carga?</li><li>¿Cómo escalarías el sistema para 50 buses en vez de 6?</li></ol></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="cierre">
+    <div class="section-head">
+      <span class="eyebrow"><span class="badge-num">11</span>Parada 11 · Cierre</span>
+      <h2>Conclusiones y cierre</h2>
+      <p>Lo que demuestra el proyecto sobre sistemas distribuidos.</p>
+    </div>
+    <div class="section-body">
+      <div class="table-wrap"><table><thead><tr><th>Componente</th><th>Archivo / Herramienta</th><th>Función</th></tr></thead><tbody>
+        <tr><td>Bus (cliente)</td><td><code>BusCliente.java</code></td><td>Envía GPS al servidor cada 3s siguiendo rutas reales de Lima/Callao.</td></tr>
+        <tr><td>Servidor central</td><td><code>ServidorATU.java</code></td><td>Recibe GPS por TCP, guarda en BD, sirve JSON por HTTP.</td></tr>
+        <tr><td>Base de datos</td><td>MariaDB</td><td>Almacena historial de ubicaciones.</td></tr>
+        <tr><td>Mapa web</td><td><code>dashboard.html</code> + Leaflet.js</td><td>Muestra los buses en tiempo real.</td></tr>
+        <tr><td>Firewall</td><td>nftables</td><td>Bloquea conexiones no autorizadas.</td></tr>
+        <tr><td>Alta disponibilidad</td><td>HAProxy</td><td>Redirige al respaldo si el principal cae.</td></tr>
+      </tbody></table></div>
+      <div class="grid-3">
+        <div class="card info"><h3>Comunicación</h3><p>El servidor acepta múltiples clientes concurrentes con un <code>ExecutorService</code>, procesando el protocolo <code>ID|lat|lon</code> sin bloquear a otros buses.</p></div>
+        <div class="card success"><h3>Persistencia y API</h3><p>MariaDB guarda cada ubicación con timestamp automático; el endpoint <code>/buses</code> devuelve la última posición por bus mediante <code>GROUP BY</code>.</p></div>
+        <div class="card warning"><h3>Resiliencia y seguridad</h3><p>HAProxy logra failover transparente en menos de 10 segundos; nftables reduce la superficie de ataque a solo los puertos necesarios.</p></div>
+      </div>
+      <h3>Servicios habilitados al inicio del sistema</h3>
+      <div class="table-wrap"><table><thead><tr><th>Servicio</th><th>Comando</th><th>Estado</th></tr></thead><tbody>
+        <tr><td>MariaDB</td><td><code>systemctl enable mariadb</code></td><td>Habilitado</td></tr>
+        <tr><td>HAProxy</td><td><code>systemctl enable haproxy</code></td><td>Habilitado</td></tr>
+        <tr><td>nftables</td><td><code>systemctl enable nftables</code></td><td>Habilitado</td></tr>
+      </tbody></table></div>
+      <h3>Comandos de limpieza</h3>
+      <pre><code>cd ~/atu_proyecto
+./detener_atu.sh
+
+# Verificar que nada quedó escuchando
+ss -tulnp | grep -E "5050|5051|8080|8081|9000|9001|7070"</code></pre>
+    </div>
+  </section>
+
+  <section id="referencias">
+    <div class="section-head">
+      <span class="eyebrow"><span class="badge-num">12</span>Parada 12 · Recursos</span>
+      <h2>Código fuente completo y referencias</h2>
+      <p>Esta guía muestra fragmentos clave; el código completo y siempre actualizado vive en el repositorio del proyecto.</p>
+    </div>
+    <div class="section-body">
+      <a class="repo-cta" href="https://github.com/JimyRojasB/atu-proyecto" target="_blank" rel="noopener">
+        <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        Ver repositorio en GitHub
+      </a>
+      <div class="file-grid">
+        <a class="file-card" href="https://github.com/JimyRojasB/atu-proyecto/blob/master/ServidorATU.java" target="_blank" rel="noopener"><span class="ext">.java</span><span><span class="fname">ServidorATU.java</span><span class="fdesc">Servidor TCP + HTTP, JDBC</span></span></a>
+        <a class="file-card" href="https://github.com/JimyRojasB/atu-proyecto/blob/master/BusCliente.java" target="_blank" rel="noopener"><span class="ext">.java</span><span><span class="fname">BusCliente.java</span><span class="fdesc">Simulador de flota GPS</span></span></a>
+        <a class="file-card html" href="https://github.com/JimyRojasB/atu-proyecto/blob/master/dashboard.html" target="_blank" rel="noopener"><span class="ext">html</span><span><span class="fname">dashboard.html</span><span class="fdesc">Mapa Leaflet.js en vivo</span></span></a>
+        <a class="file-card html" href="https://github.com/JimyRojasB/atu-proyecto/blob/master/dashboard2.html" target="_blank" rel="noopener"><span class="ext">html</span><span><span class="fname">dashboard2.html</span><span class="fdesc">Panel de control técnico</span></span></a>
+        <a class="file-card html" href="https://github.com/JimyRojasB/atu-proyecto/blob/master/dashboard3.html" target="_blank" rel="noopener"><span class="ext">html</span><span><span class="fname">dashboard3.html</span><span class="fdesc">Consulta de tiempo de viaje</span></span></a>
+        <a class="file-card sh" href="https://github.com/JimyRojasB/atu-proyecto/blob/master/iniciar_atu.sh" target="_blank" rel="noopener"><span class="ext">.sh</span><span><span class="fname">iniciar_atu.sh</span><span class="fdesc">Arranque de todo el sistema</span></span></a>
+        <a class="file-card sh" href="https://github.com/JimyRojasB/atu-proyecto/blob/master/detener_atu.sh" target="_blank" rel="noopener"><span class="ext">.sh</span><span><span class="fname">detener_atu.sh</span><span class="fdesc">Apagado ordenado</span></span></a>
+        <a class="file-card md" href="https://github.com/JimyRojasB/atu-proyecto/blob/master/INFORME_ATU.md" target="_blank" rel="noopener"><span class="ext">.md</span><span><span class="fname">INFORME_ATU.md</span><span class="fdesc">Informe técnico de entrega</span></span></a>
+        <a class="file-card md" href="https://github.com/JimyRojasB/atu-proyecto/blob/master/EXPLICACION_CODIGO.md" target="_blank" rel="noopener"><span class="ext">.md</span><span><span class="fname">EXPLICACION_CODIGO.md</span><span class="fdesc">Código explicado línea a línea</span></span></a>
+      </div>
+      <div class="note"><strong>Sobre esta guía:</strong> documenta el sistema tal como está implementado en <code>~/atu_proyecto/</code> y publicado en <a href="https://github.com/JimyRojasB/atu-proyecto" target="_blank" rel="noopener">github.com/JimyRojasB/atu-proyecto</a>, con una identidad visual inspirada en los colores institucionales de la ATU (navy <code>#004C97</code> y cian <code>#00A3E0</code>). Si el código cambia, actualiza el repo y esta guía seguirá enlazando a la versión vigente.</div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="foot-badge">
+    <div class="bus-badge">
+      <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="8" y="10" width="48" height="34" rx="6" fill="#fff"/>
+        <rect x="8" y="24" width="48" height="6" fill="#00A3E0"/>
+        <rect x="14" y="16" width="9" height="6" rx="1.5" fill="#00A3E0"/>
+        <rect x="27" y="16" width="9" height="6" rx="1.5" fill="#00A3E0"/>
+        <rect x="40" y="16" width="9" height="6" rx="1.5" fill="#00A3E0"/>
+        <circle cx="19" cy="47" r="6" fill="#062B4D"/><circle cx="45" cy="47" r="6" fill="#062B4D"/>
+        <circle cx="19" cy="47" r="2.4" fill="#fff"/><circle cx="45" cy="47" r="2.4" fill="#fff"/>
+      </svg>
+    </div>
+    <h2>Universidad Norbert Wiener</h2>
+  </div>
+  <p>Proyecto integrador · Sistema ATU de monitoreo de buses en tiempo real · Debian 13</p>
+  <p>Identidad visual inspirada en los colores institucionales de la Autoridad de Transporte Urbano de Lima y Callao.</p>
+</footer>
+
+</body>
+</html>

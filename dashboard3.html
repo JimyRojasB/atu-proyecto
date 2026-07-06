@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATU — Consulta de Tiempo de Viaje</title>
+    <link rel="stylesheet" href="leaflet/leaflet.css"/>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0d0d1a; color: #e0e0e0; min-height: 100vh; }
+
+        header {
+            background: linear-gradient(135deg, #1a1a3e, #2d2d6e);
+            padding: 14px 24px;
+            display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 2px solid #e63946;
+            flex-wrap: wrap; gap: 10px;
+        }
+        header h1 { font-size: 1.2rem; color: #fff; letter-spacing: 1px; }
+        header .links a {
+            color: #aaa; text-decoration: none; margin-left: 16px;
+            font-size: 0.85rem; padding: 5px 12px; border-radius: 4px;
+            border: 1px solid #333; transition: all 0.2s;
+        }
+        header .links a:hover, header .links a.active { color: #fff; background: #e63946; border-color: #e63946; }
+
+        .container { max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; }
+
+        .card {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 10px; padding: 20px;
+            margin-bottom: 16px;
+        }
+        .card h3 {
+            font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1.5px;
+            color: #888; margin-bottom: 14px; padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+
+        .form-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+        }
+        @media (max-width: 800px) { .form-grid { grid-template-columns: 1fr 1fr; } }
+
+        label { display: block; font-size: 0.72rem; color: #999; text-transform: uppercase;
+                letter-spacing: 0.5px; margin-bottom: 6px; }
+        select {
+            width: 100%; padding: 9px 10px; background: #16162a; color: #fff;
+            border: 1px solid #333; border-radius: 6px; font-size: 0.85rem;
+        }
+        select:focus { outline: none; border-color: #e63946; }
+
+        button#btn-consultar {
+            grid-column: 1 / -1;
+            background: #e63946; color: #fff; border: none; padding: 12px;
+            border-radius: 8px; font-size: 0.9rem; font-weight: 700; cursor: pointer;
+            letter-spacing: 0.5px; margin-top: 4px; transition: background 0.2s;
+        }
+        button#btn-consultar:hover { background: #c9303c; }
+
+        .resultado-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+        @media (max-width: 800px) { .resultado-grid { grid-template-columns: 1fr 1fr; } }
+        .kpi { text-align: center; padding: 14px 10px; background: rgba(255,255,255,0.03); border-radius: 8px; }
+        .kpi .valor { font-size: 1.7rem; font-weight: 700; color: #fff; line-height: 1.1; }
+        .kpi .label { font-size: 0.72rem; color: #888; margin-top: 6px; }
+
+        #resultado-vacio { color: #555; font-size: 0.85rem; text-align: center; padding: 24px 0; }
+
+        .aviso {
+            font-size: 0.78rem; color: #ffc107; background: rgba(255,193,7,0.08);
+            border: 1px solid rgba(255,193,7,0.25); border-radius: 8px; padding: 10px 12px; margin-top: 12px;
+        }
+        .aviso.error { color: #e63946; background: rgba(230,57,70,0.08); border-color: rgba(230,57,70,0.25); }
+        .aviso.ok { color: #2ecc71; background: rgba(46,204,113,0.08); border-color: rgba(46,204,113,0.25); }
+
+        #mini-mapa { height: 320px; border-radius: 8px; overflow: hidden; }
+
+        .badge-sim {
+            display: inline-block; background: rgba(255,193,7,0.15); color: #ffc107;
+            font-size: 0.68rem; padding: 3px 9px; border-radius: 10px; font-weight: 700;
+            letter-spacing: 0.5px; margin-left: 8px; vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>🧑‍💼 ATU — Consulta de Tiempo de Viaje</h1>
+    <div class="links">
+        <a href="dashboard.html">Mapa en vivo</a>
+        <a href="dashboard2.html">Panel de control</a>
+        <a href="dashboard3.html" class="active">Consulta de viaje</a>
+    </div>
+</header>
+
+<div class="container">
+
+    <div class="card">
+        <h3>Planifica tu viaje <span class="badge-sim">SIMULACIÓN</span></h3>
+        <div class="form-grid">
+            <div>
+                <label for="sel-ruta">Bus / Ruta</label>
+                <select id="sel-ruta"></select>
+            </div>
+            <div>
+                <label for="sel-origen">Paradero de origen</label>
+                <select id="sel-origen"></select>
+            </div>
+            <div>
+                <label for="sel-destino">Paradero de destino</label>
+                <select id="sel-destino"></select>
+            </div>
+            <div>
+                <label for="sel-trafico">Condición de tráfico</label>
+                <select id="sel-trafico">
+                    <option value="25">Fluido (25 km/h)</option>
+                    <option value="18" selected>Normal (18 km/h)</option>
+                    <option value="10">Congestionado (10 km/h)</option>
+                </select>
+            </div>
+            <button id="btn-consultar">Consultar tiempo de viaje</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>Resultado estimado</h3>
+        <div id="resultado-vacio">Selecciona una ruta y presiona "Consultar tiempo de viaje"</div>
+        <div class="resultado-grid" id="resultado-grid" style="display:none">
+            <div class="kpi"><div class="valor" id="kpi-espera">—</div><div class="label">Espera del bus</div></div>
+            <div class="kpi"><div class="valor" id="kpi-viaje">—</div><div class="label">Tiempo de viaje</div></div>
+            <div class="kpi"><div class="valor" id="kpi-total">—</div><div class="label">Tiempo total</div></div>
+            <div class="kpi"><div class="valor" id="kpi-llegada">—</div><div class="label">Llegada estimada</div></div>
+        </div>
+        <div id="aviso-estado"></div>
+    </div>
+
+    <div class="card">
+        <h3>Ubicación de referencia</h3>
+        <div id="mini-mapa"></div>
+    </div>
+
+</div>
+
+<script src="leaflet/leaflet.js"></script>
+<script>
+// Mismos puntos de ruta usados por BusCliente.java (origen, punto intermedio, destino)
+const RUTAS_PARADAS = {
+    'BUS-101': { nombre: 'Av. Javier Prado (San Isidro → La Molina)', paradas: [
+        { nombre: 'San Isidro (origen)', lat: -12.0956, lon: -77.0356 },
+        { nombre: 'San Borja (intermedio)', lat: -12.0870, lon: -77.0000 },
+        { nombre: 'La Molina (destino)', lat: -12.0780, lon: -76.9600 }
+    ]},
+    'BUS-202': { nombre: 'Av. Arequipa (Lima Centro → Miraflores)', paradas: [
+        { nombre: 'Lima Centro (origen)', lat: -12.0464, lon: -77.0310 },
+        { nombre: 'Lince (intermedio)', lat: -12.0850, lon: -77.0310 },
+        { nombre: 'Miraflores (destino)', lat: -12.1200, lon: -77.0290 }
+    ]},
+    'BUS-303': { nombre: 'Av. La Marina (San Miguel → Callao)', paradas: [
+        { nombre: 'San Miguel (origen)', lat: -12.0700, lon: -77.0850 },
+        { nombre: 'Bellavista (intermedio)', lat: -12.0580, lon: -77.1150 },
+        { nombre: 'Callao (destino)', lat: -12.0464, lon: -77.1500 }
+    ]},
+    'BUS-404': { nombre: 'Av. Universitaria (Los Olivos → San Miguel)', paradas: [
+        { nombre: 'Los Olivos (origen)', lat: -11.9800, lon: -77.0620 },
+        { nombre: 'San Martín de Porres (intermedio)', lat: -12.0250, lon: -77.0620 },
+        { nombre: 'San Miguel (destino)', lat: -12.0800, lon: -77.0780 }
+    ]},
+    'BUS-505': { nombre: 'Av. Brasil (Breña → Magdalena)', paradas: [
+        { nombre: 'Breña (origen)', lat: -12.0550, lon: -77.0650 },
+        { nombre: 'Pueblo Libre (intermedio)', lat: -12.0850, lon: -77.0610 },
+        { nombre: 'Magdalena (destino)', lat: -12.1050, lon: -77.0540 }
+    ]},
+    'BUS-606': { nombre: 'Av. Benavides (Miraflores → Surco)', paradas: [
+        { nombre: 'Miraflores (origen)', lat: -12.1150, lon: -77.0290 },
+        { nombre: 'Santiago de Surco (intermedio)', lat: -12.1220, lon: -77.0000 },
+        { nombre: 'Surco (destino)', lat: -12.1300, lon: -76.9600 }
+    ]}
+};
+
+const FACTOR_SINUOSIDAD = 1.3; // las calles no son línea recta; factor de corrección
+const IP = window.location.hostname;
+const API_BUSES = `http://${IP}:8080/buses`;
+
+const selRuta = document.getElementById('sel-ruta');
+const selOrigen = document.getElementById('sel-origen');
+const selDestino = document.getElementById('sel-destino');
+
+function poblarRutas() {
+    Object.entries(RUTAS_PARADAS).forEach(([id, r]) => {
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = `${id} — ${r.nombre}`;
+        selRuta.appendChild(opt);
+    });
+    poblarParadas();
+}
+
+function poblarParadas() {
+    const ruta = RUTAS_PARADAS[selRuta.value];
+    [selOrigen, selDestino].forEach(sel => sel.innerHTML = '');
+    ruta.paradas.forEach((p, i) => {
+        const o1 = document.createElement('option'); o1.value = i; o1.textContent = p.nombre;
+        selOrigen.appendChild(o1);
+        const o2 = document.createElement('option'); o2.value = i; o2.textContent = p.nombre;
+        selDestino.appendChild(o2);
+    });
+    selDestino.selectedIndex = ruta.paradas.length - 1; // por defecto, destino = último punto
+}
+
+selRuta.addEventListener('change', poblarParadas);
+
+function distanciaKm(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function formatMin(min) {
+    if (min < 1) return '<1 min';
+    if (min < 60) return `${Math.round(min)} min`;
+    const h = Math.floor(min / 60);
+    const m = Math.round(min % 60);
+    return `${h}h ${m}m`;
+}
+
+// Mini mapa Leaflet
+const mapa = L.map('mini-mapa').setView([-12.0464, -77.0428], 12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors | ATU Lima', maxZoom: 18
+}).addTo(mapa);
+
+let capaOrigen, capaDestino, capaBus, capaLinea;
+function limpiarCapas() {
+    [capaOrigen, capaDestino, capaBus, capaLinea].forEach(c => { if (c) mapa.removeLayer(c); });
+}
+
+function iconoPunto(emoji, color) {
+    return L.divIcon({
+        html: `<div style="background:${color};border:2px solid white;border-radius:50%;width:28px;height:28px;
+               display:flex;align-items:center;justify-content:center;font-size:13px;
+               box-shadow:0 2px 8px rgba(0,0,0,.5)">${emoji}</div>`,
+        className: '', iconSize: [28,28], iconAnchor: [14,14]
+    });
+}
+
+async function obtenerBusActual(idBus) {
+    try {
+        const r = await fetch(API_BUSES, { signal: AbortSignal.timeout(2500) });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const buses = await r.json();
+        return buses.find(b => b.id_bus === idBus) || null;
+    } catch (e) {
+        return undefined; // undefined = error de conexión, null = sin ese bus
+    }
+}
+
+async function consultar() {
+    const idBus = selRuta.value;
+    const ruta = RUTAS_PARADAS[idBus];
+    const iOrigen = parseInt(selOrigen.value);
+    const iDestino = parseInt(selDestino.value);
+    const velocidad = parseFloat(document.getElementById('sel-trafico').value);
+    const origen = ruta.paradas[iOrigen];
+    const destino = ruta.paradas[iDestino];
+
+    const avisoEl = document.getElementById('aviso-estado');
+    avisoEl.innerHTML = '';
+
+    if (iOrigen === iDestino) {
+        avisoEl.innerHTML = '<div class="aviso error">El paradero de origen y destino no pueden ser el mismo.</div>';
+        return;
+    }
+
+    const distViaje = distanciaKm(origen.lat, origen.lon, destino.lat, destino.lon) * FACTOR_SINUOSIDAD;
+    const tiempoViajeMin = (distViaje / velocidad) * 60;
+
+    const busActual = await obtenerBusActual(idBus);
+    let tiempoEsperaMin = null;
+    let posBus = null;
+
+    if (busActual) {
+        posBus = { lat: parseFloat(busActual.latitud), lon: parseFloat(busActual.longitud) };
+        const distEspera = distanciaKm(posBus.lat, posBus.lon, origen.lat, origen.lon) * FACTOR_SINUOSIDAD;
+        tiempoEsperaMin = (distEspera / velocidad) * 60;
+    }
+
+    const tiempoTotalMin = (tiempoEsperaMin || 0) + tiempoViajeMin;
+    const llegada = new Date(Date.now() + tiempoTotalMin * 60000);
+
+    document.getElementById('resultado-vacio').style.display = 'none';
+    document.getElementById('resultado-grid').style.display = 'grid';
+    document.getElementById('kpi-espera').textContent = tiempoEsperaMin !== null ? formatMin(tiempoEsperaMin) : '—';
+    document.getElementById('kpi-viaje').textContent = formatMin(tiempoViajeMin);
+    document.getElementById('kpi-total').textContent = formatMin(tiempoTotalMin);
+    document.getElementById('kpi-llegada').textContent = llegada.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+
+    if (busActual === undefined) {
+        avisoEl.innerHTML = '<div class="aviso error">No se pudo conectar al servidor ATU en vivo (¿está corriendo iniciar_atu.sh?). Se muestra solo el tiempo de viaje origen-destino.</div>';
+    } else if (busActual === null) {
+        avisoEl.innerHTML = `<div class="aviso">No hay datos en vivo de ${idBus} en este momento. Se muestra solo el tiempo de viaje origen-destino.</div>`;
+    } else {
+        avisoEl.innerHTML = '<div class="aviso ok">Espera calculada con la posición GPS real más reciente del bus.</div>';
+    }
+    avisoEl.innerHTML += '<div class="aviso">Simulación educativa: usa distancia entre coordenadas con un factor de corrección por calles, no tránsito en tiempo real.</div>';
+
+    // Actualizar mini mapa
+    limpiarCapas();
+    capaOrigen = L.marker([origen.lat, origen.lon], { icon: iconoPunto('🟢', '#2ecc71') }).addTo(mapa).bindPopup('Origen: ' + origen.nombre);
+    capaDestino = L.marker([destino.lat, destino.lon], { icon: iconoPunto('🔴', '#e63946') }).addTo(mapa).bindPopup('Destino: ' + destino.nombre);
+    const puntosLinea = [[origen.lat, origen.lon], [destino.lat, destino.lon]];
+    if (posBus) {
+        capaBus = L.marker([posBus.lat, posBus.lon], { icon: iconoPunto('🚌', '#246BCE') }).addTo(mapa).bindPopup(idBus + ' (posición actual)');
+        puntosLinea.unshift([posBus.lat, posBus.lon]);
+    }
+    capaLinea = L.polyline(puntosLinea, { color: '#ffc107', weight: 3, opacity: 0.7, dashArray: '6 6' }).addTo(mapa);
+    mapa.fitBounds(L.latLngBounds(puntosLinea), { padding: [30,30] });
+}
+
+document.getElementById('btn-consultar').addEventListener('click', consultar);
+
+poblarRutas();
+</script>
+</body>
+</html>

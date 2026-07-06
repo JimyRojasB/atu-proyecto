@@ -2,7 +2,7 @@
 ## Proyecto ATU — Sistema de Monitoreo de Buses en Tiempo Real
 
 **Curso:** Sistemas Distribuidos  
-**Fecha:** 22 de junio de 2026  
+**Fecha:** 22 de junio de 2026 (actualizado 05 de julio de 2026 — se agregaron las Partes 8 y 9)  
 **Alumno:** debian1  
 
 ---
@@ -506,6 +506,184 @@ HAProxy llama a `GET /health` cada 2 segundos. Si el servidor responde `OK`, est
 
 ---
 
+# PARTE 8 — ARCHIVO: dashboard2.html (Panel de Control)
+
+## ¿Qué hace este archivo?
+
+Es una segunda vista del mismo sistema, pensada para el **administrador** en vez del público general. En lugar de un mapa, muestra números, estados y un registro de eventos — como el panel de control de una torre de monitoreo.
+
+## Explicación por partes
+
+```html
+<div class="grid-main">
+    <div class="card kpi">
+        <div class="valor" id="kpi-buses">—</div>
+        <div class="label">Buses activos</div>
+    </div>
+    ...
+</div>
+```
+**¿Qué son los KPI?**
+KPI significa "indicador clave" (Key Performance Indicator). Aquí se muestran tres: buses activos, mensajes TCP recibidos y el uptime (tiempo que el servidor lleva encendido). Los números grandes se llenan con JavaScript, no están fijos en el HTML.
+
+---
+
+```javascript
+async function verificarHealth(url, elementId) {
+    try {
+        const r = await fetch(url, { signal: AbortSignal.timeout(2000) });
+        const el = document.getElementById(elementId);
+        if (r.ok) {
+            el.textContent = 'ACTIVO';
+            el.className = 'nodo-status status-ok';
+        } else {
+            el.textContent = 'ERROR';
+            el.className = 'nodo-status status-err';
+        }
+        return r.ok;
+    } catch {
+        el.textContent = 'CAÍDO';
+        el.className = 'nodo-status status-err';
+        return false;
+    }
+}
+```
+**¿Qué hace esto?**
+Llama al endpoint `/health` de cada servidor (el principal en `:8080` y el respaldo en `:8081`), el mismo que usa HAProxy para decidir el failover. Si responde a tiempo, pinta el nodo de verde ("ACTIVO"); si tarda más de 2 segundos o falla, lo pinta de rojo ("CAÍDO"). Así el panel muestra en vivo lo mismo que HAProxy está verificando por detrás.
+
+---
+
+```javascript
+async function actualizarStats() {
+    const r = await fetch(API_STATS);
+    const s = await r.json();
+    document.getElementById('kpi-buses').textContent = s.buses_activos;
+    document.getElementById('kpi-mensajes').textContent = s.mensajes_recibidos;
+    document.getElementById('kpi-uptime').textContent = formatUptime(s.uptime_segundos);
+    ...
+}
+```
+**¿Qué hace esto?**
+Llama al endpoint `/stats` de `ServidorATU.java` (el mismo que devuelve `puerto_tcp`, `mensajes_recibidos`, `uptime_segundos`, `buses_activos`) y actualiza los tres KPI. También compara el conteo de mensajes contra la lectura anterior para escribir una línea en el log de eventos, por ejemplo `+3 nuevos`.
+
+---
+
+```javascript
+buses.forEach(bus => {
+    const segs = Math.floor((Date.now() - new Date(bus.timestamp).getTime()) / 1000);
+    const estado = segs < 10 ? 'pill-ok' : 'pill-warn';
+    ...
+});
+```
+**¿Qué hace esto?**
+Por cada bus de la tabla, calcula hace cuántos segundos llegó su última señal GPS. Si fue hace menos de 10 segundos se marca "EN LÍNEA" (verde); si no, "TARDÍO" (amarillo). Esto avisa visualmente si un bus dejó de reportar, sin tener que revisar los logs a mano.
+
+---
+
+```javascript
+async function ciclo() {
+    await Promise.all([
+        actualizarBuses(),
+        actualizarStats(),
+        verificarHealth(API_HEALTH1, 'arch-srv1'),
+        verificarHealth(API_HEALTH2, 'arch-srv2'),
+    ]);
+    ...
+}
+setInterval(ciclo, 3000);
+```
+**¿Qué hace `Promise.all`?**
+Lanza las cuatro peticiones (buses, stats, health principal, health respaldo) **al mismo tiempo** en vez de una tras otra, y espera a que todas terminen antes de seguir. Así el panel se actualiza cada 3 segundos sin que una petición lenta retrase a las demás.
+
+---
+
+# PARTE 9 — ARCHIVO: dashboard3.html (Consulta de Tiempo de Viaje)
+
+## ¿Qué hace este archivo?
+
+Simula la app que usaría un **pasajero**: elige en qué bus/ruta viajará, desde qué paradero hasta cuál, y el sistema le calcula cuánto falta para que llegue el bus y cuánto dura el viaje. Es la pieza que le faltaba al sistema para representar los tres roles típicos de una arquitectura de transporte: bus (cliente GPS), administrador (panel de control) y pasajero (esta consulta).
+
+## Explicación por partes
+
+```javascript
+const RUTAS_PARADAS = {
+    'BUS-101': { nombre: 'Av. Javier Prado (San Isidro → La Molina)', paradas: [
+        { nombre: 'San Isidro (origen)', lat: -12.0956, lon: -77.0356 },
+        { nombre: 'San Borja (intermedio)', lat: -12.0870, lon: -77.0000 },
+        { nombre: 'La Molina (destino)', lat: -12.0780, lon: -76.9600 }
+    ]},
+    ...
+};
+```
+**¿Qué es esto?**
+Para cada uno de los 6 buses, se definieron 3 "paradas" con nombre (origen, intermedio, destino). Las coordenadas **no son inventadas**: son el primer punto, un punto de la mitad y el último punto de la misma ruta que ya usa `BusCliente.java` para simular el movimiento del bus. Así el paradero coincide con el camino real que recorre el bus en el mapa.
+
+---
+
+```javascript
+function distanciaKm(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+```
+**¿Qué es la fórmula de Haversine?**
+Es la fórmula estándar para calcular la distancia entre dos coordenadas GPS (latitud/longitud) teniendo en cuenta que la Tierra es una esfera, no un plano. `R = 6371` es el radio de la Tierra en kilómetros. El resultado final es la distancia en línea recta entre los dos puntos.
+
+---
+
+```javascript
+const FACTOR_SINUOSIDAD = 1.3;
+const distViaje = distanciaKm(origen.lat, origen.lon, destino.lat, destino.lon) * FACTOR_SINUOSIDAD;
+const tiempoViajeMin = (distViaje / velocidad) * 60;
+```
+**¿Por qué multiplicar por 1.3?**
+La fórmula de Haversine da la distancia "en línea recta" (como el vuelo de un pájaro), pero un bus no vuela: sigue calles, cuadras y curvas. El factor `1.3` es una corrección simple para acercarse más a la distancia real que recorrería el bus por avenida. No es un cálculo de rutas real (como Google Maps), es una aproximación educativa.
+
+---
+
+```javascript
+async function obtenerBusActual(idBus) {
+    const r = await fetch(API_BUSES, { signal: AbortSignal.timeout(2500) });
+    const buses = await r.json();
+    return buses.find(b => b.id_bus === idBus) || null;
+}
+```
+**¿Qué hace esto?**
+Le pregunta al `ServidorATU` real (endpoint `/buses`, el mismo que usan los otros dos dashboards) dónde está el bus elegido **en este momento**. Si el servidor no responde, la función devuelve `undefined`; si responde pero el bus no está en la lista, devuelve `null`. Esta diferencia se usa después para mostrar un aviso distinto en cada caso.
+
+---
+
+```javascript
+const distEspera = distanciaKm(posBus.lat, posBus.lon, origen.lat, origen.lon) * FACTOR_SINUOSIDAD;
+const tiempoEsperaMin = (distEspera / velocidad) * 60;
+
+const tiempoTotalMin = (tiempoEsperaMin || 0) + tiempoViajeMin;
+const llegada = new Date(Date.now() + tiempoTotalMin * 60000);
+```
+**¿Qué hace esto paso a paso?**
+1. Calcula qué tan lejos está el bus **ahora mismo** del paradero de origen elegido por el pasajero.
+2. Con esa distancia y la velocidad promedio (elegida en el selector "Condición de tráfico": fluido 25 km/h, normal 18 km/h, congestionado 10 km/h), calcula el **tiempo de espera**.
+3. Suma tiempo de espera + tiempo de viaje = **tiempo total**.
+4. Le suma ese total a la hora actual para mostrar la **hora estimada de llegada**.
+
+---
+
+```javascript
+capaLinea = L.polyline(puntosLinea, { color: '#ffc107', weight: 3, opacity: 0.7, dashArray: '6 6' }).addTo(mapa);
+mapa.fitBounds(L.latLngBounds(puntosLinea), { padding: [30,30] });
+```
+**¿Qué hace esto?**
+Dibuja en el mini-mapa una línea punteada amarilla entre la posición actual del bus, el paradero de origen y el paradero de destino, y ajusta el zoom (`fitBounds`) para que los tres puntos se vean completos en pantalla.
+
+---
+
+**Aviso importante que muestra el propio dashboard:** esta es una **simulación educativa**. Usa distancia entre coordenadas (no las calles reales), no considera semáforos, tránsito en tiempo real ni el trazado exacto de las avenidas. Sirve para demostrar el concepto de "consulta de tiempo de viaje" apoyándose en los datos GPS reales que ya produce el sistema, pero no reemplaza un motor de ruteo real.
+
+---
+
 # RESUMEN FINAL
 
 | Componente | Archivo/Herramienta | Función |
@@ -514,9 +692,12 @@ HAProxy llama a `GET /health` cada 2 segundos. Si el servidor responde `OK`, est
 | Servidor central | `ServidorATU.java` | Recibe GPS, guarda en BD, sirve JSON |
 | Base de datos | MariaDB | Almacena historial de ubicaciones |
 | Mapa web | `dashboard.html` + Leaflet.js | Muestra buses en tiempo real |
+| Panel de control | `dashboard2.html` | KPIs, health checks y log de eventos para el administrador |
+| Consulta de viaje | `dashboard3.html` | Simula tiempo de espera y viaje para el pasajero |
 | Firewall | nftables | Bloquea conexiones no autorizadas |
 | Alta disponibilidad | HAProxy | Redirige al respaldo si el principal cae |
 
 ---
 
-*Informe explicativo generado el 22/06/2026 — Proyecto ATU Monitor v1.0*
+*Informe explicativo generado el 22/06/2026 — Proyecto ATU Monitor v1.0*  
+*Actualizado el 05/07/2026 — se agregó la explicación de `dashboard2.html` y `dashboard3.html`*
