@@ -75,14 +75,64 @@ a{color:var(--cyan-deep)}
 /* ---------- ROUTE NAV (TOC) ---------- */
 .route{margin-top:-30px;position:relative;z-index:3;background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid var(--border-soft);padding:22px 26px 18px}
 .route h2{font-size:1.05rem;color:var(--navy);text-transform:uppercase;letter-spacing:.08em;margin-bottom:16px}
-.route-line{display:flex;flex-wrap:wrap;gap:0;position:relative}
-.route-line:before{content:"";position:absolute;left:14px;right:14px;top:15px;height:3px;background:linear-gradient(90deg,var(--navy),var(--cyan));border-radius:3px;z-index:0}
-.stop{display:flex;flex-direction:column;align-items:flex-start;gap:8px;text-decoration:none;color:var(--ink);flex:1 1 190px;padding:0 14px 14px 14px;position:relative;z-index:1}
-.stop .dot{width:32px;height:32px;border-radius:50%;background:var(--surface);border:3px solid var(--navy);color:var(--navy);font-family:var(--display);font-weight:800;font-size:.82rem;display:flex;align-items:center;justify-content:center}
+.route-line{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  column-gap:18px;
+  row-gap:28px;
+  position:relative;
+}
+.stop{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:8px;
+  text-decoration:none;
+  color:var(--ink);
+  padding:0 0 4px 0;
+  position:relative;
+  z-index:1;
+}
+.stop:not(:nth-child(4n))::after{
+  content:"";
+  position:absolute;
+  top:15px;
+  left:16px;
+  width:calc(100% - 16px + 18px);
+  height:3px;
+  background:linear-gradient(90deg,var(--navy),var(--cyan));
+  border-radius:3px;
+  z-index:0;
+}
+.stop:last-child::after{ display:none; }
+.stop .dot{width:32px;height:32px;border-radius:50%;background:var(--surface);border:3px solid var(--navy);color:var(--navy);font-family:var(--display);font-weight:800;font-size:.82rem;display:flex;align-items:center;justify-content:center;position:relative;z-index:1}
 .stop:nth-child(odd) .dot{border-color:var(--cyan);color:var(--cyan-deep)}
 .stop span.label{font-size:.86rem;font-weight:700;line-height:1.25}
 .print{text-align:right;margin:8px 2px 0}
 .print button{border:0;background:var(--navy);color:#fff;font-weight:700;border-radius:999px;padding:9px 16px;cursor:pointer;font-family:var(--body)}
+
+@media(max-width:620px){
+  .route-line{ grid-template-columns:repeat(2,1fr); }
+  .stop::after{ display:none; }
+  .stop:not(:nth-child(2n))::after{
+    display:block;
+    content:"";
+    position:absolute;
+    top:15px;
+    left:16px;
+    width:calc(100% - 16px + 18px);
+    height:3px;
+    background:linear-gradient(90deg,var(--navy),var(--cyan));
+    border-radius:3px;
+    z-index:0;
+  }
+  .stop:last-child::after{ display:none; }
+}
+
+@media(max-width:400px){
+  .route-line{ grid-template-columns:1fr; }
+  .stop::after{ display:none !important; }
+}
 
 /* ---------- SECTIONS ---------- */
 section{margin:40px 0;background:var(--surface);border:1px solid var(--border-soft);border-radius:var(--radius);overflow:hidden;box-shadow:0 8px 26px rgba(4,32,64,.07)}
@@ -484,10 +534,10 @@ server.createContext("/health", exchange -> {
     chain forward { policy drop; }
     chain output  { policy accept; }
 }</code></pre></div></div>
-      <div class="step"><div class="num">2</div><div><h3>Aplicar y habilitar</h3><pre><code>sudo cp nftables.conf /etc/nftables.conf
+      <div class="step"><div class="num">2</div><div><h3>Aplicar y habilitar</h3><pre><code>sudo cp config/nftables.conf /etc/nftables.conf
 sudo systemctl enable nftables
 sudo systemctl restart nftables
-sudo nft list ruleset</code></pre></div></div>
+sudo nft list ruleset</code></pre><p>El archivo <code>config/nftables.conf</code> ya viene incluido en el repositorio.</p></div></div>
       <div class="table-wrap"><table><thead><tr><th>Puerto</th><th>¿Para qué?</th></tr></thead><tbody>
         <tr><td>22</td><td>SSH (administración remota)</td></tr>
         <tr><td>5050 / 5051</td><td>Buses → Servidor TCP (principal / respaldo)</td></tr>
@@ -514,7 +564,8 @@ sudo nft list ruleset</code></pre></div></div>
         <text x="850" y="200" font-size="13" fill="#4C6A88" font-family="Arial">health check GET /health</text><text x="850" y="220" font-size="13" fill="#4C6A88" font-family="Arial">cada 2s · 3 fallos = caído</text>
       </svg></div>
 
-      <div class="step"><div class="num">1</div><div><h3>Configuración (<code>/etc/haproxy/haproxy.cfg</code>)</h3><p><strong>Frontend TCP :9000</strong> → backend round-robin: principal <code>localhost:5050</code> (health check cada 2s) y respaldo <code>localhost:5051</code> (solo si el principal cae).</p><p><strong>Frontend HTTP :9001</strong> → backend round-robin: principal <code>localhost:8080</code> (health check <code>GET /health</code>) y respaldo <code>localhost:8081</code>.</p><p><strong>Panel de estadísticas:</strong> <code>http://10.230.60.102:9999/stats</code></p></div></div>
+      <div class="step"><div class="num">1</div><div><h3>Configuración (<code>/etc/haproxy/haproxy.cfg</code>)</h3><pre><code>sudo cp config/haproxy.cfg /etc/haproxy/haproxy.cfg
+sudo systemctl restart haproxy</code></pre><p><strong>Frontend TCP :9000</strong> → backend round-robin: principal <code>localhost:5050</code> (health check cada 2s) y respaldo <code>localhost:5051</code> (solo si el principal cae).</p><p><strong>Frontend HTTP :9001</strong> → backend round-robin: principal <code>localhost:8080</code> (health check <code>GET /health</code>) y respaldo <code>localhost:8081</code>.</p><p><strong>Panel de estadísticas:</strong> <code>http://10.230.60.102:9999/stats</code></p><p>El archivo <code>config/haproxy.cfg</code> ya viene incluido en el repositorio.</p></div></div>
       <div class="step"><div class="num">2</div><div><h3>Prueba de failover realizada</h3><ol><li>Se terminó el proceso del servidor principal con <code>kill &lt;PID&gt;</code>.</li><li>HAProxy detectó la caída vía health check (intervalo 2s, umbral 3 fallos).</li><li>A los ~6 segundos, el tráfico se redirigió automáticamente al respaldo (:8081).</li><li>El endpoint <code>/buses</code> siguió respondiendo sin interrupción, ahora desde el respaldo.</li><li>Al restaurar el principal, HAProxy lo reincorporó a la rotación automáticamente.</li></ol>
       <pre><code>[ANTES]   curl http://localhost:9001/buses  →  HTTP 200 (desde :8080)
 [FALLA]   kill &lt;PID servidor principal&gt;
